@@ -5,21 +5,53 @@ import argparse
 import asyncio
 import csv
 import json
+import tomllib
 from collections import Counter, defaultdict
+from dataclasses import replace
 from pathlib import Path
 
 import httpx
 
 from app.config import Settings
 from app.domain import Brand, MaterialType
+from app.providers.base import ProviderError
 from app.providers.openai_compatible import OpenAICompatibleProvider
+from app.training import load_training_examples
 
 
-async def evaluate(manifest: Path, output: Path, target_accuracy: float) -> int:
+def load_settings(ark_config: Path | None) -> Settings:
     settings = Settings.from_env()
+    if ark_config is None:
+        return settings
+    with ark_config.open("rb") as handle:
+        config = tomllib.load(handle)
+    required = ("ARK_API_URL", "ARK_API_KEY", "ARK_DOUBAO_MODEL")
+    missing = [key for key in required if not str(config.get(key, "")).strip()]
+    if missing:
+        raise RuntimeError(f"方舟配置缺少字段：{', '.join(missing)}")
+    return replace(
+        settings,
+        vision_base_url=str(config["ARK_API_URL"]).strip(),
+        vision_api_style="responses",
+        vision_api_key=str(config["ARK_API_KEY"]).strip(),
+        vision_model=str(config["ARK_DOUBAO_MODEL"]).strip(),
+    )
+
+
+async def evaluate(
+    manifest: Path,
+    output: Path,
+    target_accuracy: float,
+    ark_config: Path | None = None,
+) -> int:
+    settings = load_settings(ark_config)
     if not settings.vision_api_key or not settings.vision_model:
         raise RuntimeError("请先配置 VISION_API_KEY 和 VISION_MODEL")
-    provider = OpenAICompatibleProvider(settings)
+    training_examples = load_training_examples(
+        manifest,
+        max_per_label=settings.vision_examples_per_label,
+    )
+    provider = OpenAICompatibleProvider(settings, training_examples)
 
     with manifest.open(encoding="utf-8-sig") as handle:
         samples = [row for row in csv.DictReader(handle) if row["split"] == "test"]
@@ -34,9 +66,31 @@ async def evaluate(manifest: Path, output: Path, target_accuracy: float) -> int:
                 response = await client.get(sample["image_url"])
                 response.raise_for_status()
                 content_type = response.headers.get("content-type", "image/jpeg").split(";")[0]
-                detected = await provider.analyze(response.content, content_type)
+                detected = None
+                error_message = None
+                for attempt in range(2):
+                    try:
+                        detected = await provider.analyze(response.content, content_type)
+                        break
+                    except ProviderError as error:
+                        error_message = str(error)
+                        if attempt == 0:
+                            await asyncio.sleep(0.25)
             actual_brand = Brand(sample["brand"])
             actual_type = MaterialType(sample["material_type"])
+            if detected is None:
+                return {
+                    "sample_id": sample["sample_id"],
+                    "actual_brand": actual_brand.value,
+                    "actual_material_type": actual_type.value,
+                    "predicted_brand": None,
+                    "predicted_material_type": None,
+                    "confidence": 0,
+                    "brand_correct": False,
+                    "type_correct": False,
+                    "exact_correct": False,
+                    "error": error_message,
+                }
             return {
                 "sample_id": sample["sample_id"],
                 "actual_brand": actual_brand.value,
@@ -67,6 +121,7 @@ async def evaluate(manifest: Path, output: Path, target_accuracy: float) -> int:
         "manifest": str(manifest),
         "provider": provider.name,
         "model": settings.vision_model,
+        "training_reference_count": len(training_examples),
         "test_count": total,
         "target_accuracy": target_accuracy,
         "exact_accuracy": sum(bool(item["exact_correct"]) for item in predictions) / total,
@@ -104,11 +159,24 @@ def main() -> None:
     parser.add_argument(
         "--output", type=Path, default=Path("artifacts/evaluation_report.json")
     )
+    parser.add_argument(
+        "--ark-config",
+        type=Path,
+        help="读取本机方舟 TOML 配置；密钥只在内存中使用，不写入评测报告",
+    )
     parser.add_argument("--target-accuracy", type=float, default=0.90)
     args = parser.parse_args()
-    raise SystemExit(asyncio.run(evaluate(args.manifest, args.output, args.target_accuracy)))
+    raise SystemExit(
+        asyncio.run(
+            evaluate(
+                args.manifest,
+                args.output,
+                args.target_accuracy,
+                args.ark_config,
+            )
+        )
+    )
 
 
 if __name__ == "__main__":
     main()
-

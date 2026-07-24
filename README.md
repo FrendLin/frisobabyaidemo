@@ -7,7 +7,7 @@
 - 低置信度人工复核、画质预警、识别证据与失败关闭；
 - 220 张样本的固定 176/44 分层划分及 90% 联合准确率门禁脚本。
 
-> 当前仓库不内置模型密钥，也不伪造 90% 结果。必须配置一个支持图片输入的 OpenAI-compatible 视觉模型，再运行固定测试集评测。原始数据没有负样本且缺少“店内海报”，因此当前数据不能证明真实通过/驳回准确率。详见 [`docs/requirements.md`](docs/requirements.md)。
+> 当前仓库不内置模型密钥，也不伪造 90% 结果。支持 Chat Completions 与 Responses 两种 OpenAI-compatible 协议；必须配置一个支持图片输入的视觉模型，再运行固定测试集评测。原始数据没有负样本且缺少“店内海报”，因此当前数据不能证明真实通过/驳回准确率。详见 [`docs/requirements.md`](docs/requirements.md)。
 
 ## 快速启动
 
@@ -26,6 +26,9 @@ cp .env.example .env
 export VISION_API_KEY="..."
 export VISION_MODEL="your-vision-model"
 export VISION_BASE_URL="https://your-openai-compatible-endpoint/v1"
+export VISION_API_STYLE="auto"  # auto / chat_completions / responses
+export VISION_REFERENCE_MANIFEST="data/dataset_manifest.csv"
+export VISION_EXAMPLES_PER_LABEL="1"
 ```
 
 启动：
@@ -64,7 +67,15 @@ python scripts/prepare_dataset.py "/path/to/大型品牌物料审核.xlsx"
 python scripts/evaluate.py
 ```
 
-评测报告写入 `artifacts/evaluation_report.json`。联合准确率小于 90% 时脚本退出码为 2，可直接作为 CI/CD 门禁。联合准确率要求品牌和类型同时正确；44 张中至少 40 张正确才通过。
+如果使用本机方舟配置，可直接读取 TOML；文件内容和密钥不会进入报告或仓库：
+
+```bash
+python scripts/evaluate.py --ark-config /path/to/personal_config.toml
+```
+
+评测会从 176 张训练集中按已有“品牌×类型”联合标签各抽取 1 张人工标注原型，作为多模态上下文校准，再对 44 张测试集逐张判断；测试标签不会进入提示词。报告写入 `artifacts/evaluation_report.json`。联合准确率小于 90% 时脚本退出码为 2，可直接作为 CI/CD 门禁。联合准确率要求品牌和类型同时正确；44 张中至少 40 张正确才通过。
+
+2026-07-24 使用 `doubao-seed-2.0-lite` 和固定测试集实测为：联合准确率 34/44（77.3%）、品牌准确率 43/44（97.7%）、物料类型准确率 35/44（79.5%），未通过 90% 门禁。主要混淆是“灯箱”被判为“橱窗单透/墙贴”或“店招/外立面广告”。详见 [`docs/evaluation-2026-07-24.md`](docs/evaluation-2026-07-24.md)。
 
 ## 测试
 
@@ -80,8 +91,11 @@ pytest
 |---|---|---|
 | `VISION_PROVIDER` | `openai_compatible` | 当前支持的识别供应商适配器 |
 | `VISION_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible API 根地址 |
+| `VISION_API_STYLE` | `auto` | `auto`、`chat_completions` 或 `responses` |
 | `VISION_API_KEY` | 空 | API 密钥 |
 | `VISION_MODEL` | 空 | 支持图像输入的模型名 |
+| `VISION_REFERENCE_MANIFEST` | 空 | 可选训练清单；生产 POC 建议设为 `data/dataset_manifest.csv` |
+| `VISION_EXAMPLES_PER_LABEL` | `1` | 每个已有联合标签提供给模型的训练原型数 |
 | `MIN_CONFIDENCE` | `0.70` | 低于该值转人工复核 |
 | `ALLOWED_IMAGE_HOSTS` | `static.51dh.com.cn` | 批量图片域名白名单，逗号分隔 |
 | `BATCH_MAX_ROWS` | `200` | 单批最大行数 |
@@ -97,4 +111,3 @@ docs/requirements.md 客户需求、四品牌特性、数据缺口与验收口�
 scripts/             数据划分与模型评测
 tests/               离线自动化测试
 ```
-
