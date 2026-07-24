@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>美素佳儿大型物料 AI 审核</title>
+    <meta
+      name="description"
+      content="按品牌与物料类型审核线下大型物料，支持单图识别与 Excel 批量处理。"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="site-header">
+        <a class="brand-mark" href="/" aria-label="返回首页">
+          <span class="brand-icon">F</span>
+          <span>
+            <strong>Friso Material AI</strong>
+            <small>大型物料审核 POC</small>
+          </span>
+        </a>
+        <div class="health-pill" id="healthPill">
+          <span class="health-dot"></span>
+          <span id="healthText">检测识别服务…</span>
+        </div>
+      </header>
+
+      <main>
+        <section class="hero">
+          <div>
+            <p class="eyebrow">FIELD MATERIAL REVIEW</p>
+            <h1>把“品牌 + 物料类型”<br />变成可追溯的审核结果</h1>
+            <p class="hero-copy">
+              系统先独立识别图片中的子品牌与物料形态，再与上传分组比对。
+              证据不足或置信度过低时转人工复核，不会默认通过。
+            </p>
+          </div>
+          <div class="hero-metrics" aria-label="项目范围">
+            <article><strong>4</strong><span>子品牌</span></article>
+            <article><strong>6</strong><span>物料类型</span></article>
+            <article><strong>2</strong><span>审核模式</span></article>
+          </div>
+        </section>
+
+        <section class="workspace">
+          <nav class="tabs" aria-label="审核模式">
+            <button class="tab active" type="button" data-tab="single">
+              <span>01</span> 单张图片审核
+            </button>
+            <button class="tab" type="button" data-tab="batch">
+              <span>02</span> Excel 批量审核
+            </button>
+            <button class="tab" type="button" data-tab="rules">
+              <span>03</span> 判定口径
+            </button>
+          </nav>
+
+          <section class="tab-panel active" id="panel-single">
+            <div class="form-column">
+              <div class="section-heading">
+                <p class="step-label">UPLOAD & VERIFY</p>
+                <h2>单张图片审核</h2>
+                <p>请选择业务分组并上传门店实拍图，系统将独立识别后进行双重比对。</p>
+              </div>
+              <form id="singleForm">
+                <div class="field-grid">
+                  <label>
+                    <span>期望品牌</span>
+                    <select name="brand" required>
+                      <option value="">请选择</option>
+                      <option>皇家</option>
+                      <option>旺玥</option>
+                      <option>源悦</option>
+                      <option>尊悦</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>期望物料类型</span>
+                    <select name="material_type" required>
+                      <option value="">请选择</option>
+                      <option>灯箱</option>
+                      <option>橱窗单透/墙贴</option>
+                      <option>店内海报（非货架）</option>
+                      <option>店招/外立面广告</option>
+                      <option>吊旗</option>
+                      <option>包柱画面</option>
+                    </select>
+                  </label>
+                </div>
+                <label class="drop-zone" id="dropZone">
+                  <input
+                    id="imageInput"
+                    name="image"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    required
+                  />
+                  <img id="imagePreview" alt="" />
+                  <div class="drop-copy" id="dropCopy">
+                    <span class="upload-icon" aria-hidden="true">↥</span>
+                    <strong>拖放或选择门店实拍图</strong>
+                    <small>JPG / PNG / WebP，单张不超过 15MB</small>
+                  </div>
+                </label>
+                <button class="primary-button" id="reviewButton" type="submit">
+                  <span>开始审核</span><span aria-hidden="true">→</span>
+                </button>
+              </form>
+            </div>
+            <aside class="result-column" id="resultCard" aria-live="polite">
+              <div class="empty-result">
+                <span class="result-orbit" aria-hidden="true"></span>
+                <h3>等待图片</h3>
+                <p>审核完成后，这里会显示结论、识别结果、置信度与图片证据。</p>
+              </div>
+            </aside>
+          </section>
+
+          <section class="tab-panel" id="panel-batch">
+            <div class="batch-layout">
+              <div>
+                <div class="section-heading">
+                  <p class="step-label">BULK PROCESSING</p>
+                  <h2>Excel 批量审核</h2>
+                  <p>
+                    保留原工作表和原字段，在右侧追加审核结果。图片链接默认仅允许来自配置的白名单域名。
+                  </p>
+                </div>
+                <ol class="batch-steps">
+                  <li><span>1</span><div><strong>下载模板</strong><p>必填列：品牌、物料类型、图片链接。</p></div></li>
+                  <li><span>2</span><div><strong>填入待审数据</strong><p>品牌和类型必须使用系统标准名称。</p></div></li>
+                  <li><span>3</span><div><strong>上传并下载结果</strong><p>单行失败不会中断整批任务。</p></div></li>
+                </ol>
+                <a class="secondary-button" href="/api/batch/template">下载 Excel 模板</a>
+              </div>
+              <form class="batch-card" id="batchForm">
+                <label class="batch-upload">
+                  <span class="file-badge">XLSX</span>
+                  <strong id="batchFileName">选择待审核 Excel</strong>
+                  <small>单次最多 200 行，可通过环境变量调整</small>
+                  <input id="batchInput" type="file" accept=".xlsx" required />
+                </label>
+                <button class="primary-button" id="batchButton" type="submit">
+                  <span>上传并处理</span><span aria-hidden="true">→</span>
+                </button>
+                <p class="batch-status" id="batchStatus" aria-live="polite"></p>
+              </form>
+            </div>
+          </section>
+
+          <section class="tab-panel" id="panel-rules">
+            <div class="section-heading compact">
+              <p class="step-label">AUDIT STANDARD</p>
+              <h2>六类物料判定口径</h2>
+              <p>品牌必须可见；场景、位置和物料结构共同决定物料类型。</p>
+            </div>
+            <div class="rules-grid">
+              <article><span>01</span><h3>灯箱</h3><p>位于货架或墙体顶部；有灯光或电线，有明显厚度，常为长方形或圆形。</p></article>
+              <article><span>02</span><h3>橱窗单透 / 墙贴</h3><p>单透贴于玻璃或形成橱窗置景；墙贴是门店墙面的大型海报，满足其一即可。</p></article>
+              <article><span>03</span><h3>店内海报</h3><p>必须在店内，通常贴于墙面、柜台侧面或店内展示板，且不属于货架本体。</p></article>
+              <article><span>04</span><h3>店招 / 外立面</h3><p>必须在店外；店招或外墙/店外展示板广告满足其一，并需出现对应品牌资产。</p></article>
+              <article><span>05</span><h3>吊旗</h3><p>悬挂于店内天花板、通道或陈列区上方，通常成组、批量、错落出现。</p></article>
+              <article><span>06</span><h3>包柱画面</h3><p>必须在店内，由海报或灯箱完整包裹立柱，形成圆柱或直立方柱形态。</p></article>
+            </div>
+          </section>
+        </section>
+      </main>
+      <footer>
+        <span>FrieslandCampina · 美素佳儿大型物料审核 POC</span>
+        <span>识别服务不可用时不产生“通过”结论</span>
+      </footer>
+    </div>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
+
