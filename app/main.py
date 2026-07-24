@@ -14,6 +14,7 @@ from app.providers.base import ProviderError, UnavailableProvider, VisionProvide
 from app.providers.openai_compatible import OpenAICompatibleProvider
 from app.quality import InvalidImageError
 from app.reviewer import MaterialReviewer
+from app.training import load_training_examples
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -28,7 +29,16 @@ def _provider_from_settings(settings: Settings) -> VisionProvider:
         return UnavailableProvider(
             "未配置 VISION_API_KEY 或 VISION_MODEL，系统不会在无模型时默认通过"
         )
-    return OpenAICompatibleProvider(settings)
+    training_examples = ()
+    if settings.vision_reference_manifest:
+        manifest = Path(settings.vision_reference_manifest)
+        if not manifest.is_file():
+            return UnavailableProvider(f"训练清单不存在：{manifest}")
+        training_examples = load_training_examples(
+            manifest,
+            max_per_label=settings.vision_examples_per_label,
+        )
+    return OpenAICompatibleProvider(settings, training_examples)
 
 
 def create_app(
@@ -130,4 +140,3 @@ def create_app(
 
 
 app = create_app()
-
