@@ -1,0 +1,98 @@
+.source-form {
+  width: min(1240px, calc(100% - 40px));
+  margin: 0 auto 24px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+.path-field span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.path-field input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--mist);
+}
+.source-actions { display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.source-hint { margin-top: 12px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+.labeler-workspace {
+  width: min(1240px, calc(100% - 40px));
+  margin: 0 auto 40px;
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.labeler-side { display: flex; flex-direction: column; gap: 16px; }
+.progress-card, .filter-card, .export-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+}
+.progress-card h3, .filter-card h3, .export-card h3, .label-group h3 {
+  margin: 0 0 12px; font-size: 14px; color: var(--navy);
+}
+.progress-bar { height: 8px; background: var(--mist); border-radius: 999px; overflow: hidden; }
+.progress-bar span { display: block; height: 100%; width: 0; background: var(--blue-2); transition: width 0.3s; }
+.progress-card p { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+.filter-card label { display: block; margin-bottom: 12px; }
+.filter-card label span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.filter-card select, .manifest-field input {
+  width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--mist);
+}
+.export-actions { display: flex; gap: 8px; margin-bottom: 10px; }
+.export-card .secondary-button { width: 100%; text-align: center; }
+.export-actions .secondary-button { flex: 1; }
+
+.thumb-list {
+  list-style: none; margin: 0; padding: 0;
+  max-height: 420px; overflow-y: auto;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--paper);
+}
+.thumb {
+  padding: 10px 14px; border-bottom: 1px solid var(--line); cursor: pointer;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.thumb:last-child { border-bottom: none; }
+.thumb strong { font-size: 13px; color: var(--ink); word-break: break-all; }
+.thumb small { font-size: 11px; color: var(--muted); }
+.thumb.active { background: rgba(9, 108, 174, 0.08); }
+.thumb.done { border-left: 3px solid var(--success); }
+.thumb.done small { color: var(--success); }
+
+.labeler-main { display: flex; flex-direction: column; gap: 16px; }
+.viewer-card, .label-panel {
+  background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 20px; box-shadow: var(--shadow);
+}
+.viewer-image {
+  min-height: 340px; display: flex; align-items: center; justify-content: center;
+  background: var(--mist); border-radius: 12px; overflow: hidden;
+}
+.viewer-image img { max-width: 100%; max-height: 520px; object-fit: contain; }
+.viewer-empty { color: var(--muted); font-size: 14px; }
+.viewer-meta { margin: 12px 0 0; font-size: 12px; color: var(--muted); word-break: break-all; }
+.save-status { margin: 8px 0 0; font-size: 13px; min-height: 18px; }
+.save-status.saving { color: var(--warning); }
+.save-status.saved { color: var(--success); }
+.save-status.error { color: var(--danger); cursor: pointer; text-decoration: underline; }
+
+.label-group { margin-bottom: 20px; }
+.chip-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-group { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; width: 100%; }
+.chip-group-title { width: 100%; font-size: 12px; color: var(--muted); }
+.chip {
+  padding: 7px 14px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--paper); cursor: pointer; font-size: 13px; color: var(--ink); transition: all 0.15s;
+}
+.chip:hover { border-color: var(--blue-2); }
+.chip.selected { background: var(--blue); border-color: var(--blue); color: #fff; }
+.manifest-field span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.nav-actions { display: flex; gap: 12px; margin-top: 18px; }
+
+@media (max-width: 900px) {
+  .labeler-workspace { grid-template-columns: 1fr; }
+}

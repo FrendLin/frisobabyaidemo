@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import mimetypes
+from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Body, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+from app import labeling
 from app.batch import BatchValidationError, build_template, process_workbook
 from app.config import Settings
 from app.domain import Brand, MaterialType
+from app.labeling import LabelingError, LabelStore
+from app.manifest_sync import sync_labels_to_manifest
 from app.models import ReviewDecision
 from app.providers.base import ProviderError, UnavailableProvider, VisionProvider
 from app.providers.openai_compatible import OpenAICompatibleProvider
@@ -57,11 +62,17 @@ def create_app(
     application.state.settings = effective_settings
     application.state.provider = effective_provider
     application.state.reviewer = reviewer
+    label_store = LabelStore(Path(effective_settings.labeling_data_dir))
+    application.state.label_store = label_store
     application.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
     @application.get("/", include_in_schema=False)
     async def index() -> FileResponse:
         return FileResponse(BASE_DIR / "templates" / "index.html")
+
+    @application.get("/labeler", include_in_schema=False)
+    async def labeler_page() -> FileResponse:
+        return FileResponse(BASE_DIR / "templates" / "labeler.html")
 
     @application.get("/api/health")
     async def health() -> dict[str, object]:
@@ -135,6 +146,120 @@ def create_app(
                 "Content-Disposition": 'attachment; filename="material_review_results.xlsx"'
             },
         )
+
+    # --- 图片标注筛选器 ---
+
+    def _now() -> str:
+        return datetime.now(timezone.utc).isoformat()
+
+    @application.get("/api/labeler/config")
+    async def labeler_config() -> dict[str, object]:
+        return {
+            "brand_catalog": labeling.BRAND_CATALOG,
+            "material_types": list(labeling.MATERIAL_TYPES),
+        }
+
+    @application.get("/api/labeler/scan")
+    async def labeler_scan(directory: str = Query(...)) -> dict[str, object]:
+        try:
+            resolved = labeling.resolve_directory(directory)
+            items = labeling.scan_directory(resolved)
+        except LabelingError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        records = label_store.load(resolved)
+        merged = labeling.merge_items_with_labels(items, records)
+        return {
+            "directory": str(resolved),
+            "images": merged,
+            "progress": labeling.progress(merged),
+            "duplicate_names": labeling.find_duplicate_names(items),
+        }
+
+    @application.get("/api/labeler/image")
+    async def labeler_image(
+        directory: str = Query(...), relpath: str = Query(...)
+    ) -> FileResponse:
+        try:
+            base = labeling.resolve_directory(directory)
+            target = labeling.resolve_image_within(base, relpath)
+        except LabelingError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        media_type, _ = mimetypes.guess_type(target.name)
+        return FileResponse(target, media_type=media_type or "application/octet-stream")
+
+    @application.post("/api/labeler/label")
+    async def labeler_label(payload: dict = Body(...)) -> dict[str, object]:
+        directory = payload.get("directory")
+        relpath = payload.get("relpath")
+        if not directory or not relpath:
+            raise HTTPException(status_code=422, detail="缺少 directory 或 relpath")
+        try:
+            base = labeling.resolve_directory(directory)
+            # 校验图片确实位于目录内且存在，防止对无效条目落库。
+            labeling.resolve_image_within(base, relpath)
+            record = label_store.set_label(
+                base,
+                relpath,
+                brand=payload.get("brand"),
+                material_type=payload.get("material_type"),
+                manifest_url=payload.get("manifest_url"),
+                now=_now(),
+            )
+        except LabelingError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        return {"saved": True, "record": record.to_dict()}
+
+    @application.get("/api/labeler/export")
+    async def labeler_export(
+        directory: str = Query(...),
+        fmt: str = Query("csv"),
+        mode: str = Query("all"),
+        brand: str | None = Query(None),
+        material_type: str | None = Query(None),
+    ) -> Response:
+        try:
+            resolved = labeling.resolve_directory(directory)
+            items = labeling.scan_directory(resolved)
+        except LabelingError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        records = label_store.load(resolved)
+        merged = labeling.merge_items_with_labels(items, records)
+        filtered = labeling.filter_records(
+            merged, mode=mode, brand=brand, material_type=material_type
+        )
+        if fmt == "json":
+            body = labeling.export_json(resolved, filtered)
+            return Response(
+                body,
+                media_type="application/json",
+                headers={
+                    "Content-Disposition": 'attachment; filename="labels.json"'
+                },
+            )
+        body = labeling.export_csv(filtered)
+        return Response(
+            body,
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="labels.csv"'},
+        )
+
+    @application.post("/api/labeler/sync-manifest")
+    async def labeler_sync_manifest(payload: dict = Body(...)) -> dict[str, object]:
+        directory = payload.get("directory")
+        if not directory:
+            raise HTTPException(status_code=422, detail="缺少 directory")
+        append_missing = bool(payload.get("append_missing", False))
+        try:
+            resolved = labeling.resolve_directory(directory)
+        except LabelingError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        records = list(label_store.load(resolved).values())
+        result = sync_labels_to_manifest(
+            Path(effective_settings.labeling_manifest),
+            records,
+            append_missing=append_missing,
+        )
+        return {"synced": True, "result": result.as_dict()}
 
     return application
 
