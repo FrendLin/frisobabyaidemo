@@ -19,6 +19,10 @@ class Settings:
     batch_max_rows: int = 200
     max_image_bytes: int = 15 * 1024 * 1024
     allowed_image_hosts: tuple[str, ...] = ("static.51dh.com.cn",)
+    # 图片标注筛选器的持久化目录（存标注 JSON，绝不写入用户原图目录）。
+    labeling_data_dir: str = "data/labeling"
+    # 标注结果联动的现有 POC 数据清单路径。
+    labeling_manifest: str = "data/dataset_manifest.csv"
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -45,4 +49,8 @@ class Settings:
             batch_max_rows=max(1, int(os.getenv("BATCH_MAX_ROWS", "200"))),
             max_image_bytes=max(1024, int(os.getenv("MAX_IMAGE_BYTES", str(15 * 1024 * 1024)))),
             allowed_image_hosts=hosts,
+            labeling_data_dir=os.getenv("LABELING_DATA_DIR", "data/labeling").strip(),
+            labeling_manifest=os.getenv(
+                "LABELING_MANIFEST", "data/dataset_manifest.csv"
+            ).strip(),
         )

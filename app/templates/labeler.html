@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>美素佳儿图片标注筛选器</title>
+    <meta name="description" content="按品牌与物料类型逐张标注本地图片，支持筛选、持久化与导出。" />
+    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/labeler.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="site-header">
+        <a class="brand-mark" href="/" aria-label="返回首页">
+          <span class="brand-icon">F</span>
+          <span>
+            <strong>Friso Material AI</strong>
+            <small>图片标注筛选器</small>
+          </span>
+        </a>
+        <a class="secondary-button" href="/">返回审核首页</a>
+      </header>
+
+      <main>
+        <section class="section-heading compact">
+          <p class="step-label">IMAGE LABELING</p>
+          <h1>本地图片品牌 / 物料标注</h1>
+          <p>选择本机图片目录，逐张标注主要品牌与物料类型；标注自动保存，可筛选、导出并同步进现有 POC 数据清单。</p>
+        </section>
+
+        <section class="labeler-source">
+          <form id="scanForm" class="source-form">
+            <label class="path-field">
+              <span>图片目录（本机绝对路径）</span>
+              <input
+                id="directoryInput"
+                name="directory"
+                type="text"
+                placeholder="/Users/you/photos 或 D:\\photos"
+                autocomplete="off"
+                required
+              />
+            </label>
+            <div class="source-actions">
+              <button class="secondary-button" id="pickDirButton" type="button">系统目录选择器</button>
+              <button class="primary-button" id="scanButton" type="submit"><span>扫描目录</span></button>
+            </div>
+            <input id="dirPicker" type="file" webkitdirectory directory multiple hidden />
+            <p class="source-hint" id="sourceHint">
+              提示：本工具在服务器本机读取目录。浏览器目录选择器出于安全限制只能提供文件夹名，
+              无法回传绝对路径；选择后请在上方补全完整路径，或直接粘贴路径。
+            </p>
+          </form>
+        </section>
+
+        <section class="labeler-workspace" id="workspace" hidden>
+          <aside class="labeler-side">
+            <div class="progress-card">
+              <h3>标注进度</h3>
+              <div class="progress-bar"><span id="progressFill"></span></div>
+              <p id="progressText">0 / 0</p>
+            </div>
+
+            <div class="filter-card">
+              <h3>筛选</h3>
+              <label>
+                <span>状态</span>
+                <select id="filterMode">
+                  <option value="all">全部</option>
+                  <option value="unlabeled">未标注</option>
+                  <option value="labeled">已标注</option>
+                </select>
+              </label>
+              <label>
+                <span>按品牌</span>
+                <select id="filterBrand"><option value="">全部品牌</option></select>
+              </label>
+              <label>
+                <span>按物料类型</span>
+                <select id="filterMaterial"><option value="">全部物料</option></select>
+              </label>
+            </div>
+
+            <div class="export-card">
+              <h3>导出与联动</h3>
+              <div class="export-actions">
+                <button class="secondary-button" id="exportCsv" type="button">导出 CSV</button>
+                <button class="secondary-button" id="exportJson" type="button">导出 JSON</button>
+              </div>
+              <button class="secondary-button" id="syncManifest" type="button">同步进数据清单</button>
+              <p class="source-hint" id="syncHint">
+                同步仅将“皇家四子品牌 + 六类物料 + 已填 manifest 链接”的标注写回
+                <code>dataset_manifest.csv</code>，供训练/评测流程读取。
+              </p>
+            </div>
+
+            <ul class="thumb-list" id="thumbList"></ul>
+          </aside>
+
+          <div class="labeler-main">
+            <div class="viewer-card">
+              <div class="viewer-image" id="viewerImage">
+                <p class="viewer-empty">选择左侧图片开始标注</p>
+              </div>
+              <p class="viewer-meta" id="viewerMeta"></p>
+              <p class="save-status" id="saveStatus" aria-live="polite"></p>
+            </div>
+
+            <div class="label-panel">
+              <div class="label-group">
+                <h3>品牌（单选）</h3>
+                <div id="brandOptions" class="chip-grid"></div>
+              </div>
+              <div class="label-group">
+                <h3>物料类型（单选）</h3>
+                <div id="materialOptions" class="chip-grid"></div>
+              </div>
+              <label class="manifest-field">
+                <span>关联数据清单链接（可选，用于同步）</span>
+                <input id="manifestUrl" type="text" placeholder="https://static.51dh.com.cn/..." autocomplete="off" />
+              </label>
+              <div class="nav-actions">
+                <button class="secondary-button" id="prevButton" type="button">上一张</button>
+                <button class="primary-button" id="saveNextButton" type="button"><span>保存并下一张</span></button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+      <footer>
+        <span>FrieslandCampina · 美素佳儿图片标注筛选器</span>
+        <span>标注只写入独立数据文件，不修改原始图片</span>
+      </footer>
+    </div>
+    <script src="/static/labeler.js" defer></script>
+  </body>
+</html>
