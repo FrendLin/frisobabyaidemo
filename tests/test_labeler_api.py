@@ -32,6 +32,8 @@ def test_labeler_page_served(tmp_path: Path) -> None:
     response = client.get("/labeler")
     assert response.status_code == 200
     assert "图片标注" in response.text
+    assert "/static/labeler.js?v=20260727-2" in response.text
+    assert response.headers["cache-control"] == "no-store"
 
 
 def test_labeler_config_lists_brands_and_materials(tmp_path: Path) -> None:

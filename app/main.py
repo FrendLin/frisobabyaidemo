@@ -73,7 +73,10 @@ def create_app(
 
     @application.get("/labeler", include_in_schema=False)
     async def labeler_page() -> FileResponse:
-        return FileResponse(BASE_DIR / "templates" / "labeler.html")
+        return FileResponse(
+            BASE_DIR / "templates" / "labeler.html",
+            headers={"Cache-Control": "no-store"},
+        )
 
     @application.get("/api/health")
     async def health() -> dict[str, object]:
