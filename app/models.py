@@ -30,6 +30,7 @@ class ExternalImageQuality(BaseModel):
     description: str
     blur: float | None = None
     brightness: float | None = None
+    brightness_description: str | None = None
     angle: float | None = None
 
 

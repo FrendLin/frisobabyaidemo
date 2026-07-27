@@ -58,35 +58,88 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
-function listHtml(items, fallback) {
-  const values = items && items.length ? items : [fallback];
-  return `<ul>${values.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
+function confirmationItem(label, expected, detected) {
+  const available = Boolean(detected);
+  const matched = available && expected === detected;
+  const judgement = !available ? "无法确认" : matched ? "确认一致" : "确认不一致";
+  const tone = !available ? "unknown" : matched ? "matched" : "mismatched";
+  return `
+    <li class="confirmation-item">
+      <div>
+        <small>${escapeHtml(label)}确认</small>
+        <strong>期望 ${escapeHtml(expected)} · 识别 ${escapeHtml(detected || "无法判断")}</strong>
+      </div>
+      <span class="confirmation-badge ${tone}">${judgement}</span>
+    </li>`;
+}
+
+function normalizedScore(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  return number >= 0 && number <= 1 ? number * 100 : number;
+}
+
+function formatScore(value) {
+  const score = normalizedScore(value);
+  if (score === null) return "--";
+  return score.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function brightnessJudgement(value) {
+  const score = normalizedScore(value);
+  if (score === null) return "未返回";
+  if (score < 25) return "偏低";
+  if (score > 55) return "偏高";
+  return "适中";
+}
+
+function qualityHtml(qualityCheck) {
+  if (!qualityCheck) return "";
+  const brightnessDescription =
+    qualityCheck.brightness_description || brightnessJudgement(qualityCheck.brightness);
+  return `
+    <section class="quality-result" aria-label="图片质量检查结果">
+      <div class="quality-heading">
+        <div>
+          <small>IMAGE QUALITY</small>
+          <h4>图片质量检查</h4>
+        </div>
+        <span class="quality-state ${qualityCheck.acceptable ? "acceptable" : "attention"}">
+          ${qualityCheck.acceptable ? "质量可用" : "建议复核"}
+        </span>
+      </div>
+      <div class="quality-metrics">
+        <article>
+          <span>模糊程度</span>
+          <strong>${formatScore(qualityCheck.blur)}</strong>
+          <small>判断：${escapeHtml(qualityCheck.description || "未返回")}</small>
+        </article>
+        <article>
+          <span>明亮度</span>
+          <strong>${formatScore(qualityCheck.brightness)}</strong>
+          <small>判断：${escapeHtml(brightnessDescription)}</small>
+        </article>
+      </div>
+      <p>分值统一按 0–100 展示；明亮度按 25 / 55 边界判断。</p>
+    </section>`;
 }
 
 function renderResult(result) {
   const labels = {
     passed: ["审核通过", "图片与上传分组一致"],
     rejected: ["审核驳回", "图片中的品牌或物料类型与上传分组不一致"],
-    manual_review: ["转人工复核", "识别证据不足或置信度未达到自动审核阈值"],
+    manual_review: ["转人工复核", "品牌或物料类型仍需人工确认"],
   };
   const [title, summary] = labels[result.status];
-  const confidence = Math.round(result.confidence * 100);
   const qualityCheck = result.quality_check;
   resultCard.innerHTML = `
     <div class="result-view">
       <div class="result-kicker">
         <span class="status-badge ${escapeHtml(result.status)}">${escapeHtml(title)}</span>
-        <div class="result-meta">
-          ${qualityCheck ? `<span>图片质量：${escapeHtml(qualityCheck.description)}</span>` : ""}
-          <small>${escapeHtml(result.provider)}</small>
-        </div>
+        <small>${escapeHtml(result.provider)}</small>
       </div>
       <h3>${escapeHtml(title)}</h3>
       <p class="result-summary">${escapeHtml(summary)}</p>
-      <div class="confidence">
-        <div class="confidence-head"><span>识别置信度</span><strong>${confidence}%</strong></div>
-        <div class="confidence-track"><div class="confidence-fill" style="width:${confidence}%"></div></div>
-      </div>
       <div class="comparison">
         <div class="comparison-card">
           <small>期望分组</small>
@@ -98,7 +151,14 @@ function renderResult(result) {
           <strong>${escapeHtml(result.detected_brand || "无法判断")} · ${escapeHtml(result.detected_material_type || "无法判断")}</strong>
         </div>
       </div>
-      <div class="result-list"><h4>审核原因</h4>${listHtml(result.reasons, "无")}</div>
+      <div class="result-list">
+        <h4>审核原因</h4>
+        <ul>
+          ${confirmationItem("品牌", result.expected_brand, result.detected_brand)}
+          ${confirmationItem("类型", result.expected_material_type, result.detected_material_type)}
+        </ul>
+      </div>
+      ${qualityHtml(qualityCheck)}
     </div>`;
 }
 

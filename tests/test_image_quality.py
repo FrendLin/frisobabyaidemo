@@ -38,6 +38,8 @@ async def test_external_quality_client_parses_review_level() -> None:
     assert result.acceptable is False
     assert result.description == "中"
     assert result.blur == pytest.approx(99.26)
+    assert result.brightness == pytest.approx(0.22)
+    assert result.brightness_description == "偏低"
 
 
 @pytest.mark.asyncio

@@ -205,7 +205,8 @@ class ExternalImageQualityClient:
             acceptable=description.casefold() not in review_descriptions,
             description=description,
             blur=_as_float(data.get("blur")),
-            brightness=_as_float(data.get("brightness")),
+            brightness=(brightness := _as_float(data.get("brightness"))),
+            brightness_description=_describe_brightness(brightness),
             angle=_as_float(data.get("angle")),
         )
 
@@ -217,3 +218,15 @@ def _as_float(value: object) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _describe_brightness(value: float | None) -> str | None:
+    """Map the API value to its documented 25/55 display bands."""
+    if value is None:
+        return None
+    score = value * 100 if 0 <= value <= 1 else value
+    if score < 25:
+        return "偏低"
+    if score > 55:
+        return "偏高"
+    return "适中"
