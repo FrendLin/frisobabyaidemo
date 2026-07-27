@@ -15,6 +15,8 @@ import hashlib
 import io
 import json
 import os
+import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -74,9 +76,12 @@ class ImageItem:
 
 @dataclass(slots=True)
 class LabelRecord:
-    """一张图片的标注结果。brand/material 均为可空字符串。"""
+    """一张图片的多标签结果，并兼容旧版单标签字段。"""
 
     relpath: str
+    brands: list[str] = field(default_factory=list)
+    material_types: list[str] = field(default_factory=list)
+    # 旧字段保留为兼容入口；仅有一个标签时同步为该值，多标签时为 None。
     brand: str | None = None
     material_type: str | None = None
     # 该图片在现有 POC 数据流程中的对应地址（清单 image_url）；
@@ -84,9 +89,21 @@ class LabelRecord:
     manifest_url: str | None = None
     updated_at: str | None = None
 
+    def __post_init__(self) -> None:
+        if not self.brands and self.brand:
+            self.brands = [self.brand]
+        if not self.material_types and self.material_type:
+            self.material_types = [self.material_type]
+        self.brand = self.brands[0] if len(self.brands) == 1 else None
+        self.material_type = (
+            self.material_types[0] if len(self.material_types) == 1 else None
+        )
+
     def to_dict(self) -> dict[str, object]:
         return {
             "relpath": self.relpath,
+            "brands": list(self.brands),
+            "material_types": list(self.material_types),
             "brand": self.brand,
             "material_type": self.material_type,
             "manifest_url": self.manifest_url,
@@ -95,23 +112,41 @@ class LabelRecord:
 
     @property
     def labeled(self) -> bool:
-        return bool(self.brand) and bool(self.material_type)
+        return bool(self.brands) and bool(self.material_types)
 
 
-def validate_brand(value: str | None) -> str | None:
-    if value in (None, ""):
-        return None
-    if value not in ALL_BRANDS:
-        raise LabelingError(f"未知品牌：{value}")
-    return value
+def _validate_selections(
+    values: object,
+    *,
+    allowed: frozenset[str],
+    label: str,
+) -> list[str]:
+    if values in (None, ""):
+        return []
+    if isinstance(values, str):
+        raw_values = [values]
+    elif isinstance(values, (list, tuple)):
+        raw_values = list(values)
+    else:
+        raise LabelingError(f"{label}必须是字符串数组")
+
+    selections: list[str] = []
+    for value in raw_values:
+        if not isinstance(value, str) or not value:
+            raise LabelingError(f"{label}包含非法值")
+        if value not in allowed:
+            raise LabelingError(f"未知{label}：{value}")
+        if value not in selections:
+            selections.append(value)
+    return selections
 
 
-def validate_material(value: str | None) -> str | None:
-    if value in (None, ""):
-        return None
-    if value not in ALL_MATERIALS:
-        raise LabelingError(f"未知物料类型：{value}")
-    return value
+def validate_brands(values: object) -> list[str]:
+    return _validate_selections(values, allowed=ALL_BRANDS, label="品牌")
+
+
+def validate_materials(values: object) -> list[str]:
+    return _validate_selections(values, allowed=ALL_MATERIALS, label="物料类型")
 
 
 def resolve_directory(raw: str) -> Path:
@@ -134,6 +169,41 @@ def resolve_directory(raw: str) -> Path:
     if not os.access(resolved, os.R_OK | os.X_OK):
         raise LabelingError("目录不可读")
     return resolved
+
+
+def pick_directory_native() -> Path | None:
+    """在 macOS 本机打开系统目录选择器，返回经过校验的绝对路径。
+
+    浏览器的 ``webkitdirectory`` 出于安全限制只暴露相对目录名，不能满足
+    后端按本机路径扫描的契约。本工具是本机 POC，因此由服务端调用系统选择器；
+    用户取消时返回 ``None``，无图形界面或非 macOS 环境则给出明确错误。
+    """
+
+    if sys.platform != "darwin":
+        raise LabelingError("当前系统不支持原生目录选择器，请手工粘贴目录绝对路径")
+    script = 'POSIX path of (choose folder with prompt "请选择待标注图片目录")'
+    try:
+        result = subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True,
+            text=True,
+            timeout=300,
+            check=False,
+        )
+    except FileNotFoundError as error:
+        raise LabelingError("系统目录选择器不可用，请手工粘贴目录绝对路径") from error
+    except subprocess.TimeoutExpired as error:
+        raise LabelingError("系统目录选择器等待超时，请重试") from error
+
+    if result.returncode != 0:
+        detail = (result.stderr or "").strip()
+        if "(-128)" in detail or "User canceled" in detail:
+            return None
+        raise LabelingError(f"系统目录选择器失败：{detail or '未知错误'}")
+    selected = result.stdout.strip()
+    if not selected:
+        return None
+    return resolve_directory(selected)
 
 
 def resolve_image_within(directory: Path, relpath: str) -> Path:
@@ -218,10 +288,19 @@ class LabelStore:
         for relpath, payload in raw.get("labels", {}).items():
             if not isinstance(payload, dict):
                 continue
+            try:
+                brands = validate_brands(
+                    payload.get("brands", payload.get("brand"))
+                )
+                material_types = validate_materials(
+                    payload.get("material_types", payload.get("material_type"))
+                )
+            except LabelingError:
+                continue
             records[relpath] = LabelRecord(
                 relpath=relpath,
-                brand=payload.get("brand"),
-                material_type=payload.get("material_type"),
+                brands=brands,
+                material_types=material_types,
                 manifest_url=payload.get("manifest_url"),
                 updated_at=payload.get("updated_at"),
             )
@@ -244,19 +323,24 @@ class LabelStore:
         directory: Path,
         relpath: str,
         *,
-        brand: str | None,
-        material_type: str | None,
+        brands: object = None,
+        material_types: object = None,
+        brand: str | None = None,
+        material_type: str | None = None,
         manifest_url: str | None,
         now: str,
     ) -> LabelRecord:
-        brand = validate_brand(brand)
-        material_type = validate_material(material_type)
+        selected_brands = validate_brands(brands if brands is not None else brand)
+        selected_materials = validate_materials(
+            material_types if material_types is not None else material_type
+        )
         records = self.load(directory)
+        existing = records.get(relpath)
         record = LabelRecord(
             relpath=relpath,
-            brand=brand,
-            material_type=material_type,
-            manifest_url=manifest_url or (records.get(relpath).manifest_url if records.get(relpath) else None),
+            brands=selected_brands,
+            material_types=selected_materials,
+            manifest_url=manifest_url or (existing.manifest_url if existing else None),
             updated_at=now,
         )
         records[relpath] = record
@@ -277,6 +361,8 @@ def merge_items_with_labels(
                 "relpath": item.relpath,
                 "name": item.name,
                 "size": item.size,
+                "brands": list(record.brands) if record else [],
+                "material_types": list(record.material_types) if record else [],
                 "brand": record.brand if record else None,
                 "material_type": record.material_type if record else None,
                 "manifest_url": record.manifest_url if record else None,
@@ -301,9 +387,9 @@ def filter_records(
             return False
         if mode == "unlabeled" and row["labeled"]:
             return False
-        if brand and row.get("brand") != brand:
+        if brand and brand not in (row.get("brands") or []):
             return False
-        if material_type and row.get("material_type") != material_type:
+        if material_type and material_type not in (row.get("material_types") or []):
             return False
         return True
 
@@ -319,14 +405,23 @@ def progress(merged: list[dict[str, object]]) -> dict[str, int]:
 def export_csv(merged: list[dict[str, object]]) -> bytes:
     buffer = io.StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["relpath", "name", "brand", "material_type", "manifest_url", "updated_at"])
+    writer.writerow(
+        [
+            "relpath",
+            "name",
+            "brands",
+            "material_types",
+            "manifest_url",
+            "updated_at",
+        ]
+    )
     for row in merged:
         writer.writerow(
             [
                 row["relpath"],
                 row["name"],
-                row.get("brand") or "",
-                row.get("material_type") or "",
+                "|".join(row.get("brands") or []),
+                "|".join(row.get("material_types") or []),
                 row.get("manifest_url") or "",
                 row.get("updated_at") or "",
             ]

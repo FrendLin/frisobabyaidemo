@@ -3,16 +3,16 @@ const state = {
   images: [],
   filtered: [],
   currentIndex: -1,
-  brand: null,
-  material: null,
+  brands: [],
+  materials: [],
   saveTimer: null,
 };
 
 const el = (id) => document.getElementById(id);
 const scanForm = el("scanForm");
 const directoryInput = el("directoryInput");
-const dirPicker = el("dirPicker");
 const pickDirButton = el("pickDirButton");
+const scanButton = el("scanButton");
 const workspace = el("workspace");
 const thumbList = el("thumbList");
 const viewerImage = el("viewerImage");
@@ -89,15 +89,23 @@ function renderFilterOptions() {
   });
 }
 
-pickDirButton.addEventListener("click", () => dirPicker.click());
-dirPicker.addEventListener("change", () => {
-  const files = dirPicker.files;
-  if (files && files.length) {
-    const rel = files[0].webkitRelativePath || files[0].name;
-    const folder = rel.split("/")[0];
-    if (!directoryInput.value) directoryInput.value = folder;
-    el("sourceHint").textContent =
-      `已选择文件夹“${folder}”（含 ${files.length} 个文件）。浏览器无法回传绝对路径，请在上方补全完整路径后扫描。`;
+pickDirButton.addEventListener("click", async () => {
+  pickDirButton.disabled = true;
+  pickDirButton.textContent = "等待系统选择…";
+  try {
+    const response = await fetch("/api/labeler/pick-directory", { method: "POST" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(`选择目录失败：${data.detail || response.status}`);
+      return;
+    }
+    if (data.cancelled || !data.directory) return;
+    directoryInput.value = data.directory;
+    el("sourceHint").textContent = `已选择：${data.directory}`;
+    await scanDirectory(data.directory);
+  } finally {
+    pickDirButton.disabled = false;
+    pickDirButton.textContent = "选择目录并扫描";
   }
 });
 
@@ -108,20 +116,25 @@ scanForm.addEventListener("submit", async (event) => {
 
 async function scanDirectory(directory) {
   if (!directory) return;
-  const params = new URLSearchParams({ directory });
-  const response = await fetch(`/api/labeler/scan?${params}`);
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    alert(`扫描失败：${err.detail || response.status}`);
-    return;
+  scanButton.disabled = true;
+  try {
+    const params = new URLSearchParams({ directory });
+    const response = await fetch(`/api/labeler/scan?${params}`);
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      alert(`扫描失败：${err.detail || response.status}`);
+      return;
+    }
+    const data = await response.json();
+    state.directory = data.directory;
+    state.images = data.images;
+    workspace.hidden = false;
+    applyFilterAndRender();
+    updateProgress(data.progress);
+    if (state.filtered.length) selectImage(0);
+  } finally {
+    scanButton.disabled = false;
   }
-  const data = await response.json();
-  state.directory = data.directory;
-  state.images = data.images;
-  workspace.hidden = false;
-  applyFilterAndRender();
-  updateProgress(data.progress);
-  if (state.filtered.length) selectImage(0);
 }
 
 [filterMode, filterBrand, filterMaterial].forEach((control) =>
@@ -139,8 +152,8 @@ function applyFilterAndRender() {
   state.filtered = state.images.filter((row) => {
     if (mode === "labeled" && !row.labeled) return false;
     if (mode === "unlabeled" && row.labeled) return false;
-    if (brand && row.brand !== brand) return false;
-    if (material && row.material_type !== material) return false;
+    if (brand && !(row.brands || []).includes(brand)) return false;
+    if (material && !(row.material_types || []).includes(material)) return false;
     return true;
   });
   renderThumbs();
@@ -153,7 +166,9 @@ function renderThumbs() {
     li.className = "thumb";
     if (index === state.currentIndex) li.classList.add("active");
     if (row.labeled) li.classList.add("done");
-    const tag = row.labeled ? `${row.brand} · ${row.material_type}` : "未标注";
+    const tag = row.labeled
+      ? `${(row.brands || []).join("、")} · ${(row.material_types || []).join("、")}`
+      : "未标注";
     li.innerHTML = `<strong>${row.name}</strong><small>${tag}</small>`;
     li.title = row.relpath;
     li.addEventListener("click", () => selectImage(index));
@@ -186,8 +201,10 @@ function selectImage(index) {
   const params = new URLSearchParams({ directory: state.directory, relpath: row.relpath });
   viewerImage.innerHTML = `<img src="/api/labeler/image?${params}" alt="${row.name}" onerror="this.replaceWith(Object.assign(document.createElement('p'),{className:'viewer-empty',textContent:'图片无法加载（可能已损坏）'}))" />`;
   viewerMeta.textContent = `${row.relpath} · ${(row.size / 1024).toFixed(1)} KB`;
-  state.brand = row.brand || null;
-  state.material = row.material_type || null;
+  state.brands = [...(row.brands || (row.brand ? [row.brand] : []))];
+  state.materials = [
+    ...(row.material_types || (row.material_type ? [row.material_type] : [])),
+  ];
   manifestUrl.value = row.manifest_url || "";
   saveStatus.textContent = row.labeled ? "已标注" : "";
   saveStatus.className = "save-status";
@@ -197,21 +214,28 @@ function selectImage(index) {
 
 function highlightChips() {
   brandOptions.querySelectorAll(".chip").forEach((chip) => {
-    chip.classList.toggle("selected", chip.dataset.brand === state.brand);
+    chip.classList.toggle("selected", state.brands.includes(chip.dataset.brand));
   });
   materialOptions.querySelectorAll(".chip").forEach((chip) => {
-    chip.classList.toggle("selected", chip.dataset.material === state.material);
+    chip.classList.toggle(
+      "selected",
+      state.materials.includes(chip.dataset.material)
+    );
   });
 }
 
 function selectBrand(name) {
-  state.brand = state.brand === name ? null : name;
+  state.brands = state.brands.includes(name)
+    ? state.brands.filter((item) => item !== name)
+    : [...state.brands, name];
   highlightChips();
   autoSave();
 }
 
 function selectMaterial(name) {
-  state.material = state.material === name ? null : name;
+  state.materials = state.materials.includes(name)
+    ? state.materials.filter((item) => item !== name)
+    : [...state.materials, name];
   highlightChips();
   autoSave();
 }
@@ -235,19 +259,23 @@ async function saveCurrent(advance) {
       body: JSON.stringify({
         directory: state.directory,
         relpath: row.relpath,
-        brand: state.brand,
-        material_type: state.material,
+        brands: state.brands,
+        material_types: state.materials,
         manifest_url: manifestUrl.value.trim() || null,
       }),
     });
     if (!response.ok) throw new Error((await response.json()).detail || "保存失败");
     const data = await response.json();
     Object.assign(row, {
+      brands: data.record.brands,
+      material_types: data.record.material_types,
       brand: data.record.brand,
       material_type: data.record.material_type,
       manifest_url: data.record.manifest_url,
       updated_at: data.record.updated_at,
-      labeled: Boolean(data.record.brand && data.record.material_type),
+      labeled: Boolean(
+        data.record.brands.length && data.record.material_types.length
+      ),
     });
     const master = state.images.find((item) => item.relpath === row.relpath);
     if (master) Object.assign(master, row);
@@ -305,8 +333,9 @@ el("syncManifest").addEventListener("click", async () => {
   }
   const r = data.result;
   alert(
-    `同步完成：更新 ${r.updated} 条，未匹配 ${r.unmatched_urls.length} 条，` +
-      `跳过非皇家 ${r.skipped_non_royal} 条、未完成 ${r.skipped_incomplete} 条。`
+      `同步完成：更新 ${r.updated} 条，未匹配 ${r.unmatched_urls.length} 条，` +
+      `跳过非皇家 ${r.skipped_non_royal} 条、多标签 ${r.skipped_multilabel} 条、` +
+      `未完成 ${r.skipped_incomplete} 条。`
   );
 });
 

@@ -74,6 +74,24 @@ def test_sync_skips_incomplete(tmp_path: Path) -> None:
     assert result.skipped_incomplete == 1
 
 
+def test_sync_skips_multilabel_record(tmp_path: Path) -> None:
+    manifest = tmp_path / "m.csv"
+    _write_manifest(manifest)
+    records = [
+        LabelRecord(
+            relpath="a.jpg",
+            brands=["皇家", "旺玥"],
+            material_types=["灯箱", "吊旗"],
+            manifest_url="https://static.51dh.com.cn/a.jpg",
+        )
+    ]
+
+    result = sync_labels_to_manifest(manifest, records)
+
+    assert result.skipped_multilabel == 1
+    assert result.updated == 0
+
+
 def test_sync_unmatched_without_append(tmp_path: Path) -> None:
     manifest = tmp_path / "m.csv"
     _write_manifest(manifest)

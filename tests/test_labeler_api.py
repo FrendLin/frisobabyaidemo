@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from PIL import Image
 
+from app import labeling
 from app.config import Settings
 from app.main import create_app
 
@@ -31,6 +32,8 @@ def test_labeler_page_served(tmp_path: Path) -> None:
     response = client.get("/labeler")
     assert response.status_code == 200
     assert "图片标注" in response.text
+    assert "/static/labeler.js?v=20260727-3" in response.text
+    assert response.headers["cache-control"] == "no-store"
 
 
 def test_labeler_config_lists_brands_and_materials(tmp_path: Path) -> None:
@@ -40,6 +43,33 @@ def test_labeler_config_lists_brands_and_materials(tmp_path: Path) -> None:
     assert "皇家美素" in groups
     assert "灯箱" in data["material_types"]
     assert len(data["material_types"]) == 6
+
+
+def test_pick_directory_returns_absolute_path(
+    tmp_path: Path, monkeypatch
+) -> None:
+    images = tmp_path / "负样本其他奶粉物料"
+    images.mkdir()
+    monkeypatch.setattr(labeling, "pick_directory_native", lambda: images.resolve())
+    client = _make_client(tmp_path)
+
+    response = client.post("/api/labeler/pick-directory")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "cancelled": False,
+        "directory": str(images.resolve()),
+    }
+
+
+def test_pick_directory_handles_cancel(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(labeling, "pick_directory_native", lambda: None)
+    client = _make_client(tmp_path)
+
+    response = client.post("/api/labeler/pick-directory")
+
+    assert response.status_code == 200
+    assert response.json() == {"cancelled": True, "directory": None}
 
 
 def test_scan_label_filter_export_flow(tmp_path: Path) -> None:
@@ -81,6 +111,31 @@ def test_scan_label_filter_export_flow(tmp_path: Path) -> None:
     assert export.status_code == 200
     body = export.content.decode("utf-8-sig")
     assert "a.jpg" in body and "b.jpg" not in body
+
+
+def test_labeler_api_saves_multiple_brands_and_materials(tmp_path: Path) -> None:
+    images = tmp_path / "images"
+    _make_image(images / "a.jpg")
+    client = _make_client(tmp_path)
+
+    response = client.post(
+        "/api/labeler/label",
+        json={
+            "directory": str(images),
+            "relpath": "a.jpg",
+            "brands": ["皇家", "爱他美"],
+            "material_types": ["灯箱", "吊旗"],
+        },
+    )
+
+    assert response.status_code == 200
+    record = response.json()["record"]
+    assert record["brands"] == ["皇家", "爱他美"]
+    assert record["material_types"] == ["灯箱", "吊旗"]
+    scan = client.get(
+        "/api/labeler/scan", params={"directory": str(images)}
+    ).json()
+    assert scan["images"][0]["labeled"] is True
 
 
 def test_scan_rejects_bad_directory(tmp_path: Path) -> None:
