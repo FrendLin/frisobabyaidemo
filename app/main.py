@@ -13,6 +13,13 @@ from app import labeling
 from app.batch import BatchValidationError, build_template, process_workbook
 from app.config import Settings
 from app.domain import Brand, MaterialType
+from app.image_quality import (
+    ExternalImageQualityClient,
+    ImagePublisher,
+    ImageQualityChecker,
+    ImageQualityServiceError,
+    OssImagePublisher,
+)
 from app.labeling import LabelingError, LabelStore
 from app.manifest_sync import sync_labels_to_manifest
 from app.models import ReviewDecision
@@ -50,10 +57,18 @@ def _provider_from_settings(settings: Settings) -> VisionProvider:
 def create_app(
     settings: Settings | None = None,
     provider: VisionProvider | None = None,
+    quality_checker: ImageQualityChecker | None = None,
+    image_publisher: ImagePublisher | None = None,
 ) -> FastAPI:
     effective_settings = settings or Settings.from_env()
     effective_provider = provider or _provider_from_settings(effective_settings)
-    reviewer = MaterialReviewer(effective_provider, effective_settings)
+    reviewer = MaterialReviewer(
+        effective_provider,
+        effective_settings,
+        quality_checker=quality_checker
+        or ExternalImageQualityClient(effective_settings),
+        image_publisher=image_publisher or OssImagePublisher(effective_settings),
+    )
 
     application = FastAPI(
         title="美素佳儿大型物料 AI 审核 POC",
@@ -92,6 +107,7 @@ def create_app(
         brand: str = Form(...),
         material_type: str = Form(...),
         image: UploadFile = File(...),
+        quality_check: bool = Form(False),
     ) -> ReviewDecision:
         try:
             expected_brand = Brand(brand)
@@ -114,10 +130,13 @@ def create_app(
                 expected_material_type=expected_material_type,
                 image_bytes=payload,
                 mime_type=mime_type,
+                check_image_quality=quality_check,
             )
         except InvalidImageError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
         except ProviderError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+        except ImageQualityServiceError as error:
             raise HTTPException(status_code=503, detail=str(error)) from error
 
     @application.get("/api/batch/template")
@@ -133,12 +152,20 @@ def create_app(
         )
 
     @application.post("/api/batch")
-    async def review_batch(workbook: UploadFile = File(...)) -> Response:
+    async def review_batch(
+        workbook: UploadFile = File(...),
+        quality_check: bool = Form(False),
+    ) -> Response:
         if not workbook.filename or not workbook.filename.lower().endswith(".xlsx"):
             raise HTTPException(status_code=422, detail="仅支持 .xlsx 文件")
         payload = await workbook.read()
         try:
-            output = await process_workbook(payload, reviewer, effective_settings)
+            output = await process_workbook(
+                payload,
+                reviewer,
+                effective_settings,
+                check_image_quality=quality_check,
+            )
         except BatchValidationError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
         return Response(

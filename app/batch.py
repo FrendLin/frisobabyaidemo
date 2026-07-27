@@ -108,6 +108,8 @@ async def process_workbook(
     workbook_bytes: bytes,
     reviewer: MaterialReviewer,
     settings: Settings,
+    *,
+    check_image_quality: bool = False,
 ) -> bytes:
     try:
         workbook = load_workbook(BytesIO(workbook_bytes))
@@ -158,6 +160,8 @@ async def process_workbook(
                         expected_material_type=material_type,
                         image_bytes=payload,
                         mime_type=mime_type,
+                        check_image_quality=check_image_quality,
+                        image_url=url,
                     )
                 return row_number, [
                     {
@@ -197,4 +201,3 @@ async def process_workbook(
     output = BytesIO()
     workbook.save(output)
     return output.getvalue()
-
