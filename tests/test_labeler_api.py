@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from PIL import Image
 
+from app import labeling
 from app.config import Settings
 from app.main import create_app
 
@@ -40,6 +41,33 @@ def test_labeler_config_lists_brands_and_materials(tmp_path: Path) -> None:
     assert "皇家美素" in groups
     assert "灯箱" in data["material_types"]
     assert len(data["material_types"]) == 6
+
+
+def test_pick_directory_returns_absolute_path(
+    tmp_path: Path, monkeypatch
+) -> None:
+    images = tmp_path / "负样本其他奶粉物料"
+    images.mkdir()
+    monkeypatch.setattr(labeling, "pick_directory_native", lambda: images.resolve())
+    client = _make_client(tmp_path)
+
+    response = client.post("/api/labeler/pick-directory")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "cancelled": False,
+        "directory": str(images.resolve()),
+    }
+
+
+def test_pick_directory_handles_cancel(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(labeling, "pick_directory_native", lambda: None)
+    client = _make_client(tmp_path)
+
+    response = client.post("/api/labeler/pick-directory")
+
+    assert response.status_code == 200
+    assert response.json() == {"cancelled": True, "directory": None}
 
 
 def test_scan_label_filter_export_flow(tmp_path: Path) -> None:

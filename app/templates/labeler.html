@@ -42,13 +42,12 @@
               />
             </label>
             <div class="source-actions">
-              <button class="secondary-button" id="pickDirButton" type="button">系统目录选择器</button>
+              <button class="secondary-button" id="pickDirButton" type="button">选择目录并扫描</button>
               <button class="primary-button" id="scanButton" type="submit"><span>扫描目录</span></button>
             </div>
-            <input id="dirPicker" type="file" webkitdirectory directory multiple hidden />
             <p class="source-hint" id="sourceHint">
-              提示：本工具在服务器本机读取目录。浏览器目录选择器出于安全限制只能提供文件夹名，
-              无法回传绝对路径；选择后请在上方补全完整路径，或直接粘贴路径。
+              推荐点击“选择目录并扫描”，系统会自动填写绝对路径并载入图片。
+              如果系统选择器不可用，也可直接粘贴本机目录绝对路径后点击“扫描目录”。
             </p>
           </form>
         </section>

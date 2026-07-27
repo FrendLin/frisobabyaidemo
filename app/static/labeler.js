@@ -11,8 +11,8 @@ const state = {
 const el = (id) => document.getElementById(id);
 const scanForm = el("scanForm");
 const directoryInput = el("directoryInput");
-const dirPicker = el("dirPicker");
 const pickDirButton = el("pickDirButton");
+const scanButton = el("scanButton");
 const workspace = el("workspace");
 const thumbList = el("thumbList");
 const viewerImage = el("viewerImage");
@@ -89,15 +89,23 @@ function renderFilterOptions() {
   });
 }
 
-pickDirButton.addEventListener("click", () => dirPicker.click());
-dirPicker.addEventListener("change", () => {
-  const files = dirPicker.files;
-  if (files && files.length) {
-    const rel = files[0].webkitRelativePath || files[0].name;
-    const folder = rel.split("/")[0];
-    if (!directoryInput.value) directoryInput.value = folder;
-    el("sourceHint").textContent =
-      `已选择文件夹“${folder}”（含 ${files.length} 个文件）。浏览器无法回传绝对路径，请在上方补全完整路径后扫描。`;
+pickDirButton.addEventListener("click", async () => {
+  pickDirButton.disabled = true;
+  pickDirButton.textContent = "等待系统选择…";
+  try {
+    const response = await fetch("/api/labeler/pick-directory", { method: "POST" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(`选择目录失败：${data.detail || response.status}`);
+      return;
+    }
+    if (data.cancelled || !data.directory) return;
+    directoryInput.value = data.directory;
+    el("sourceHint").textContent = `已选择：${data.directory}`;
+    await scanDirectory(data.directory);
+  } finally {
+    pickDirButton.disabled = false;
+    pickDirButton.textContent = "选择目录并扫描";
   }
 });
 
@@ -108,20 +116,25 @@ scanForm.addEventListener("submit", async (event) => {
 
 async function scanDirectory(directory) {
   if (!directory) return;
-  const params = new URLSearchParams({ directory });
-  const response = await fetch(`/api/labeler/scan?${params}`);
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    alert(`扫描失败：${err.detail || response.status}`);
-    return;
+  scanButton.disabled = true;
+  try {
+    const params = new URLSearchParams({ directory });
+    const response = await fetch(`/api/labeler/scan?${params}`);
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      alert(`扫描失败：${err.detail || response.status}`);
+      return;
+    }
+    const data = await response.json();
+    state.directory = data.directory;
+    state.images = data.images;
+    workspace.hidden = false;
+    applyFilterAndRender();
+    updateProgress(data.progress);
+    if (state.filtered.length) selectImage(0);
+  } finally {
+    scanButton.disabled = false;
   }
-  const data = await response.json();
-  state.directory = data.directory;
-  state.images = data.images;
-  workspace.hidden = false;
-  applyFilterAndRender();
-  updateProgress(data.progress);
-  if (state.filtered.length) selectImage(0);
 }
 
 [filterMode, filterBrand, filterMaterial].forEach((control) =>

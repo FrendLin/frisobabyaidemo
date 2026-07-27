@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import mimetypes
 from datetime import datetime, timezone
 from pathlib import Path
@@ -158,6 +159,16 @@ def create_app(
             "brand_catalog": labeling.BRAND_CATALOG,
             "material_types": list(labeling.MATERIAL_TYPES),
         }
+
+    @application.post("/api/labeler/pick-directory")
+    async def labeler_pick_directory() -> dict[str, object]:
+        try:
+            selected = await asyncio.to_thread(labeling.pick_directory_native)
+        except LabelingError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        if selected is None:
+            return {"cancelled": True, "directory": None}
+        return {"cancelled": False, "directory": str(selected)}
 
     @application.get("/api/labeler/scan")
     async def labeler_scan(directory: str = Query(...)) -> dict[str, object]:

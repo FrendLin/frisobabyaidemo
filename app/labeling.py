@@ -15,6 +15,8 @@ import hashlib
 import io
 import json
 import os
+import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -134,6 +136,41 @@ def resolve_directory(raw: str) -> Path:
     if not os.access(resolved, os.R_OK | os.X_OK):
         raise LabelingError("目录不可读")
     return resolved
+
+
+def pick_directory_native() -> Path | None:
+    """在 macOS 本机打开系统目录选择器，返回经过校验的绝对路径。
+
+    浏览器的 ``webkitdirectory`` 出于安全限制只暴露相对目录名，不能满足
+    后端按本机路径扫描的契约。本工具是本机 POC，因此由服务端调用系统选择器；
+    用户取消时返回 ``None``，无图形界面或非 macOS 环境则给出明确错误。
+    """
+
+    if sys.platform != "darwin":
+        raise LabelingError("当前系统不支持原生目录选择器，请手工粘贴目录绝对路径")
+    script = 'POSIX path of (choose folder with prompt "请选择待标注图片目录")'
+    try:
+        result = subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True,
+            text=True,
+            timeout=300,
+            check=False,
+        )
+    except FileNotFoundError as error:
+        raise LabelingError("系统目录选择器不可用，请手工粘贴目录绝对路径") from error
+    except subprocess.TimeoutExpired as error:
+        raise LabelingError("系统目录选择器等待超时，请重试") from error
+
+    if result.returncode != 0:
+        detail = (result.stderr or "").strip()
+        if "(-128)" in detail or "User canceled" in detail:
+            return None
+        raise LabelingError(f"系统目录选择器失败：{detail or '未知错误'}")
+    selected = result.stdout.strip()
+    if not selected:
+        return None
+    return resolve_directory(selected)
 
 
 def resolve_image_within(directory: Path, relpath: str) -> Path:
