@@ -201,11 +201,21 @@ class ExternalImageQualityClient:
         review_descriptions = {
             item.casefold() for item in self.settings.image_quality_review_descriptions
         }
+        blur = _as_float(data.get("blur"))
+        brightness = _as_float(data.get("brightness"))
+        blur_description = _describe_blur(blur)
+        brightness_description = _describe_brightness(brightness)
         return ExternalImageQuality(
-            acceptable=description.casefold() not in review_descriptions,
+            acceptable=(
+                description.casefold() not in review_descriptions
+                and blur_description == "正常"
+                and brightness_description == "正常"
+            ),
             description=description,
-            blur=_as_float(data.get("blur")),
-            brightness=_as_float(data.get("brightness")),
+            blur=blur,
+            blur_description=blur_description,
+            brightness=brightness,
+            brightness_description=brightness_description,
             angle=_as_float(data.get("angle")),
         )
 
@@ -217,3 +227,21 @@ def _as_float(value: object) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _describe_blur(value: float | None) -> str | None:
+    """Apply the documented blur threshold: values above 55 are blurry."""
+    if value is None:
+        return None
+    return "模糊" if value > 55 else "正常"
+
+
+def _describe_brightness(value: float | None) -> str | None:
+    """Apply the documented brightness bands on the API's 0–1 scale."""
+    if value is None:
+        return None
+    if value <= 0.3:
+        return "昏暗"
+    if value >= 0.7:
+        return "过曝"
+    return "正常"

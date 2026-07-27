@@ -80,9 +80,17 @@ class MaterialReviewer:
             status = "manual_review"
 
         if external_quality is not None and not external_quality.acceptable:
-            reasons.append(
-                f"图片质量检查结果为“{external_quality.description}”，需人工复核"
+            quality_reasons = []
+            if external_quality.blur_description == "模糊":
+                quality_reasons.append("模糊程度为“模糊”")
+            if external_quality.brightness_description not in {None, "正常"}:
+                quality_reasons.append(
+                    f"明亮度为“{external_quality.brightness_description}”"
+                )
+            detail = "、".join(quality_reasons) or (
+                f"接口描述为“{external_quality.description}”"
             )
+            reasons.append(f"图片质量检查未通过（{detail}），需人工复核")
             if status == "passed":
                 status = "manual_review"
 

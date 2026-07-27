@@ -38,6 +38,52 @@ async def test_external_quality_client_parses_review_level() -> None:
     assert result.acceptable is False
     assert result.description == "中"
     assert result.blur == pytest.approx(99.26)
+    assert result.blur_description == "模糊"
+    assert result.brightness == pytest.approx(0.22)
+    assert result.brightness_description == "昏暗"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("blur", "brightness", "blur_description", "brightness_description", "acceptable"),
+    [
+        (55, 0.5, "正常", "正常", True),
+        (55.01, 0.5, "模糊", "正常", False),
+        (55, 0.3, "正常", "昏暗", False),
+        (55, 0.7, "正常", "过曝", False),
+    ],
+)
+async def test_external_quality_client_applies_documented_thresholds(
+    blur: float,
+    brightness: float,
+    blur_description: str,
+    brightness_description: str,
+    acceptable: bool,
+) -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "status": 1,
+                "data": {
+                    "blur": str(blur),
+                    "desc": "低",
+                    "brightness": brightness,
+                    "angle": 0.1,
+                },
+            },
+        )
+
+    client = ExternalImageQualityClient(
+        Settings(image_quality_api_token="test-token"),
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = await client.inspect("https://example.com/image.jpg")
+
+    assert result.blur_description == blur_description
+    assert result.brightness_description == brightness_description
+    assert result.acceptable is acceptable
 
 
 @pytest.mark.asyncio

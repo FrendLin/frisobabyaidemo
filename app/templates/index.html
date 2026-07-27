@@ -8,7 +8,7 @@
       name="description"
       content="按品牌与物料类型审核线下大型物料，支持单图识别与 Excel 批量处理。"
     />
-    <link rel="stylesheet" href="/static/styles.css?v=20260727-1" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260728-2" />
   </head>
   <body>
     <div class="page-shell">
@@ -34,7 +34,7 @@
             <h1>把“品牌 + 物料类型”<br />变成可追溯的审核结果</h1>
             <p class="hero-copy">
               系统先独立识别图片中的子品牌与物料形态，再与上传分组比对。
-              证据不足或置信度过低时转人工复核，不会默认通过。
+              品牌或物料类型无法确认时转人工复核，不会默认通过。
             </p>
           </div>
           <div class="hero-metrics" aria-label="项目范围">
@@ -126,7 +126,7 @@
               <div class="empty-result">
                 <span class="result-orbit" aria-hidden="true"></span>
                 <h3>等待图片</h3>
-                <p>审核完成后，这里会显示结论、识别结果、置信度与审核原因。</p>
+                <p>审核完成后，这里会显示结论、品牌与类型确认，以及可选的图片质量结果。</p>
               </div>
             </aside>
           </section>
@@ -193,6 +193,6 @@
         <span>识别服务不可用时不产生“通过”结论</span>
       </footer>
     </div>
-    <script src="/static/app.js?v=20260727-1" defer></script>
+    <script src="/static/app.js?v=20260728-2" defer></script>
   </body>
 </html>

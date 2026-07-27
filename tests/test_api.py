@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from app.config import Settings
@@ -105,11 +107,26 @@ def test_template_download() -> None:
     assert response.content.startswith(b"PK")
 
 
-def test_home_page_has_quality_toggle_without_evidence_sections() -> None:
+def test_home_page_has_quality_toggle_without_confidence_copy() -> None:
     client = TestClient(create_app(Settings(), FakeProvider(DetectedMaterial(confidence=0))))
 
     response = client.get("/")
 
     assert response.status_code == 200
     assert "是否进行图片质量检查" in response.text
-    assert "置信度与图片证据" not in response.text
+    assert "置信度" not in response.text
+
+
+def test_result_ui_only_displays_brand_type_and_quality_metrics() -> None:
+    script = Path("app/static/app.js").read_text(encoding="utf-8")
+
+    assert "result.confidence" not in script
+    assert "result.reasons" not in script
+    assert 'confirmationItem("品牌"' in script
+    assert 'confirmationItem("类型"' in script
+    assert "模糊程度" in script
+    assert "明亮度" in script
+    assert "blur_description" in script
+    assert "brightness_description" in script
+    assert "result.provider" not in script
+    assert "health.provider" not in script
