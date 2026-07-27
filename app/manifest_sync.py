@@ -36,6 +36,7 @@ class SyncResult:
     appended: int = 0
     skipped_non_royal: int = 0
     skipped_incomplete: int = 0
+    skipped_multilabel: int = 0
     unmatched_urls: list[str] = None  # type: ignore[assignment]
 
     def __post_init__(self) -> None:
@@ -48,6 +49,7 @@ class SyncResult:
             "appended": self.appended,
             "skipped_non_royal": self.skipped_non_royal,
             "skipped_incomplete": self.skipped_incomplete,
+            "skipped_multilabel": self.skipped_multilabel,
             "unmatched_urls": self.unmatched_urls,
         }
 
@@ -94,10 +96,15 @@ def sync_labels_to_manifest(
     for record in records:
         if not record.manifest_url:
             continue
-        if not (record.brand and record.material_type):
+        if not (record.brands and record.material_types):
             result.skipped_incomplete += 1
             continue
-        if record.brand not in ROYAL_BRAND_VALUES or record.material_type not in MATERIAL_VALUES:
+        if len(record.brands) != 1 or len(record.material_types) != 1:
+            result.skipped_multilabel += 1
+            continue
+        brand = record.brands[0]
+        material_type = record.material_types[0]
+        if brand not in ROYAL_BRAND_VALUES or material_type not in MATERIAL_VALUES:
             result.skipped_non_royal += 1
             continue
 
@@ -105,18 +112,18 @@ def sync_labels_to_manifest(
         existing = by_url.get(url)
         if existing is not None:
             if (
-                existing.get("brand") != record.brand
-                or existing.get("material_type") != record.material_type
+                existing.get("brand") != brand
+                or existing.get("material_type") != material_type
             ):
-                existing["brand"] = record.brand
-                existing["material_type"] = record.material_type
+                existing["brand"] = brand
+                existing["material_type"] = material_type
                 result.updated += 1
                 changed = True
         elif append_missing:
             row = {
                 "sample_id": f"MS-{next_id:04d}",
-                "brand": record.brand,
-                "material_type": record.material_type,
+                "brand": brand,
+                "material_type": material_type,
                 "image_url": url,
                 "split": default_split,
             }

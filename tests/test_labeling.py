@@ -90,6 +90,41 @@ def test_label_store_update_overwrites(tmp_path: Path) -> None:
     assert records["a.jpg"].material_type == "吊旗"
 
 
+def test_label_store_supports_multiple_brands_and_materials(tmp_path: Path) -> None:
+    images = tmp_path / "images"
+    _touch(images / "a.jpg")
+    store = LabelStore(tmp_path / "store")
+    record = store.set_label(
+        images,
+        "a.jpg",
+        brands=["皇家", "爱他美"],
+        material_types=["灯箱", "吊旗"],
+        manifest_url=None,
+        now="t",
+    )
+
+    assert record.brands == ["皇家", "爱他美"]
+    assert record.material_types == ["灯箱", "吊旗"]
+    assert record.brand is None
+    assert record.material_type is None
+    assert record.labeled
+
+
+def test_label_store_migrates_legacy_single_value_payload(tmp_path: Path) -> None:
+    images = tmp_path / "images"
+    images.mkdir()
+    store = LabelStore(tmp_path / "store")
+    store._store_path(images).write_text(
+        '{"labels":{"a.jpg":{"brand":"皇家","material_type":"灯箱"}}}',
+        encoding="utf-8",
+    )
+
+    record = store.load(images)["a.jpg"]
+
+    assert record.brands == ["皇家"]
+    assert record.material_types == ["灯箱"]
+
+
 def test_label_store_rejects_unknown_values(tmp_path: Path) -> None:
     store = LabelStore(tmp_path / "store")
     with pytest.raises(LabelingError):
@@ -138,7 +173,7 @@ def test_export_csv_and_json(tmp_path: Path) -> None:
 
     csv_bytes = labeling.export_csv(merged)
     text = csv_bytes.decode("utf-8-sig")
-    assert "relpath,name,brand,material_type,manifest_url,updated_at" in text
+    assert "relpath,name,brands,material_types,manifest_url,updated_at" in text
     assert "皇家" in text and "灯箱" in text
 
     json_bytes = labeling.export_json(tmp_path, merged)

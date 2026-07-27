@@ -214,6 +214,8 @@ def create_app(
             record = label_store.set_label(
                 base,
                 relpath,
+                brands=payload.get("brands"),
+                material_types=payload.get("material_types"),
                 brand=payload.get("brand"),
                 material_type=payload.get("material_type"),
                 manifest_url=payload.get("manifest_url"),

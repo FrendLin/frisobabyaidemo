@@ -32,7 +32,7 @@ def test_labeler_page_served(tmp_path: Path) -> None:
     response = client.get("/labeler")
     assert response.status_code == 200
     assert "图片标注" in response.text
-    assert "/static/labeler.js?v=20260727-2" in response.text
+    assert "/static/labeler.js?v=20260727-3" in response.text
     assert response.headers["cache-control"] == "no-store"
 
 
@@ -111,6 +111,31 @@ def test_scan_label_filter_export_flow(tmp_path: Path) -> None:
     assert export.status_code == 200
     body = export.content.decode("utf-8-sig")
     assert "a.jpg" in body and "b.jpg" not in body
+
+
+def test_labeler_api_saves_multiple_brands_and_materials(tmp_path: Path) -> None:
+    images = tmp_path / "images"
+    _make_image(images / "a.jpg")
+    client = _make_client(tmp_path)
+
+    response = client.post(
+        "/api/labeler/label",
+        json={
+            "directory": str(images),
+            "relpath": "a.jpg",
+            "brands": ["皇家", "爱他美"],
+            "material_types": ["灯箱", "吊旗"],
+        },
+    )
+
+    assert response.status_code == 200
+    record = response.json()["record"]
+    assert record["brands"] == ["皇家", "爱他美"]
+    assert record["material_types"] == ["灯箱", "吊旗"]
+    scan = client.get(
+        "/api/labeler/scan", params={"directory": str(images)}
+    ).json()
+    assert scan["images"][0]["labeled"] is True
 
 
 def test_scan_rejects_bad_directory(tmp_path: Path) -> None:

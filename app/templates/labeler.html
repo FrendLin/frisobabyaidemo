@@ -6,7 +6,7 @@
     <title>美素佳儿图片标注筛选器</title>
     <meta name="description" content="按品牌与物料类型逐张标注本地图片，支持筛选、持久化与导出。" />
     <link rel="stylesheet" href="/static/styles.css" />
-    <link rel="stylesheet" href="/static/labeler.css?v=20260727-2" />
+    <link rel="stylesheet" href="/static/labeler.css?v=20260727-3" />
   </head>
   <body>
     <div class="page-shell">
@@ -25,7 +25,7 @@
         <section class="section-heading compact">
           <p class="step-label">IMAGE LABELING</p>
           <h1>本地图片品牌 / 物料标注</h1>
-          <p>选择本机图片目录，逐张标注主要品牌与物料类型；标注自动保存，可筛选、导出并同步进现有 POC 数据清单。</p>
+          <p>选择本机图片目录，为每张图标注一个或多个品牌与物料类型；标注自动保存，可筛选、导出并同步进现有 POC 数据清单。</p>
         </section>
 
         <section class="labeler-source">
@@ -88,8 +88,8 @@
               </div>
               <button class="secondary-button" id="syncManifest" type="button">同步进数据清单</button>
               <p class="source-hint" id="syncHint">
-                同步仅将“皇家四子品牌 + 六类物料 + 已填 manifest 链接”的标注写回
-                <code>dataset_manifest.csv</code>，供训练/评测流程读取。
+                同步仅将“单个皇家子品牌 + 单个六类物料 + 已填 manifest 链接”的标注写回
+                <code>dataset_manifest.csv</code>。该清单仍是单标签结构，多标签记录不会被压缩写入。
               </p>
             </div>
 
@@ -107,11 +107,11 @@
 
             <div class="label-panel">
               <div class="label-group">
-                <h3>品牌（单选）</h3>
+                <h3>品牌（可多选）</h3>
                 <div id="brandOptions" class="chip-grid"></div>
               </div>
               <div class="label-group">
-                <h3>物料类型（单选）</h3>
+                <h3>物料类型（可多选）</h3>
                 <div id="materialOptions" class="chip-grid"></div>
               </div>
               <label class="manifest-field">
@@ -131,6 +131,6 @@
         <span>标注只写入独立数据文件，不修改原始图片</span>
       </footer>
     </div>
-    <script src="/static/labeler.js?v=20260727-2" defer></script>
+    <script src="/static/labeler.js?v=20260727-3" defer></script>
   </body>
 </html>
