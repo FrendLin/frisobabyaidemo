@@ -13,6 +13,7 @@ const batchInput = document.getElementById("batchInput");
 const batchButton = document.getElementById("batchButton");
 const batchStatus = document.getElementById("batchStatus");
 const batchFileName = document.getElementById("batchFileName");
+const batchQualityCheck = document.getElementById("batchQualityCheck");
 
 tabs.forEach((tab) => {
   tab.addEventListener("click", () => {
@@ -70,12 +71,15 @@ function renderResult(result) {
   };
   const [title, summary] = labels[result.status];
   const confidence = Math.round(result.confidence * 100);
-  const qualityWarnings = result.quality?.warnings || [];
+  const qualityCheck = result.quality_check;
   resultCard.innerHTML = `
     <div class="result-view">
       <div class="result-kicker">
         <span class="status-badge ${escapeHtml(result.status)}">${escapeHtml(title)}</span>
-        <small>${escapeHtml(result.provider)}</small>
+        <div class="result-meta">
+          ${qualityCheck ? `<span>图片质量：${escapeHtml(qualityCheck.description)}</span>` : ""}
+          <small>${escapeHtml(result.provider)}</small>
+        </div>
       </div>
       <h3>${escapeHtml(title)}</h3>
       <p class="result-summary">${escapeHtml(summary)}</p>
@@ -95,8 +99,6 @@ function renderResult(result) {
         </div>
       </div>
       <div class="result-list"><h4>审核原因</h4>${listHtml(result.reasons, "无")}</div>
-      <div class="result-list"><h4>图片证据</h4>${listHtml(result.evidence, "模型未返回可见证据")}</div>
-      ${qualityWarnings.length ? `<div class="result-list"><h4>画质预警</h4>${listHtml(qualityWarnings, "")}</div>` : ""}
     </div>`;
 }
 
@@ -137,6 +139,7 @@ batchForm.addEventListener("submit", async (event) => {
   batchStatus.textContent = "正在下载图片并逐行审核，请勿关闭页面。";
   const formData = new FormData();
   formData.append("workbook", batchInput.files[0]);
+  formData.append("quality_check", batchQualityCheck.checked ? "true" : "false");
   try {
     const response = await fetch("/api/batch", { method: "POST", body: formData });
     if (!response.ok) {
@@ -169,4 +172,3 @@ fetch("/api/health")
     healthPill.classList.add("degraded");
     healthText.textContent = "健康检查失败";
   });
-

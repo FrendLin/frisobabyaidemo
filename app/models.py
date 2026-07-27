@@ -25,6 +25,14 @@ class ImageQuality(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class ExternalImageQuality(BaseModel):
+    acceptable: bool
+    description: str
+    blur: float | None = None
+    brightness: float | None = None
+    angle: float | None = None
+
+
 class ReviewDecision(BaseModel):
     status: Literal["passed", "rejected", "manual_review"]
     passed: bool
@@ -36,5 +44,5 @@ class ReviewDecision(BaseModel):
     reasons: list[str]
     evidence: list[str]
     quality: ImageQuality
+    quality_check: ExternalImageQuality | None = None
     provider: str
-

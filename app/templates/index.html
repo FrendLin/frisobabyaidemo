@@ -8,7 +8,7 @@
       name="description"
       content="按品牌与物料类型审核线下大型物料，支持单图识别与 Excel 批量处理。"
     />
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260727-1" />
   </head>
   <body>
     <div class="page-shell">
@@ -104,6 +104,19 @@
                     <small>JPG / PNG / WebP，单张不超过 15MB</small>
                   </div>
                 </label>
+                <label class="toggle-field">
+                  <input
+                    id="singleQualityCheck"
+                    name="quality_check"
+                    type="checkbox"
+                    value="true"
+                  />
+                  <span class="toggle-control" aria-hidden="true"></span>
+                  <span class="toggle-copy">
+                    <strong>是否进行图片质量检查</strong>
+                    <small>开启后将调用图片模糊度识别接口；质量存疑时转人工复核。</small>
+                  </span>
+                </label>
                 <button class="primary-button" id="reviewButton" type="submit">
                   <span>开始审核</span><span aria-hidden="true">→</span>
                 </button>
@@ -113,7 +126,7 @@
               <div class="empty-result">
                 <span class="result-orbit" aria-hidden="true"></span>
                 <h3>等待图片</h3>
-                <p>审核完成后，这里会显示结论、识别结果、置信度与图片证据。</p>
+                <p>审核完成后，这里会显示结论、识别结果、置信度与审核原因。</p>
               </div>
             </aside>
           </section>
@@ -141,6 +154,14 @@
                   <strong id="batchFileName">选择待审核 Excel</strong>
                   <small>单次最多 200 行，可通过环境变量调整</small>
                   <input id="batchInput" type="file" accept=".xlsx" required />
+                </label>
+                <label class="toggle-field batch-toggle">
+                  <input id="batchQualityCheck" type="checkbox" value="true" />
+                  <span class="toggle-control" aria-hidden="true"></span>
+                  <span class="toggle-copy">
+                    <strong>是否进行图片质量检查</strong>
+                    <small>开启后将逐行调用图片模糊度识别接口。</small>
+                  </span>
                 </label>
                 <button class="primary-button" id="batchButton" type="submit">
                   <span>上传并处理</span><span aria-hidden="true">→</span>
@@ -172,7 +193,6 @@
         <span>识别服务不可用时不产生“通过”结论</span>
       </footer>
     </div>
-    <script src="/static/app.js" defer></script>
+    <script src="/static/app.js?v=20260727-1" defer></script>
   </body>
 </html>
-

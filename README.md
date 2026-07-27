@@ -32,6 +32,22 @@ export VISION_REFERENCE_MANIFEST="data/dataset_manifest.csv"
 export VISION_EXAMPLES_PER_LABEL="1"
 ```
 
+可选图片质量检查使用客户提供的实时接口。Token 只能通过运行环境注入，不得写入
+仓库；单图上传会先写入项目隔离的私有 OSS 路径，再向质量接口提供 15 分钟有效的
+签名 URL。Excel 中已有图片 URL，不会重复上传：
+
+```bash
+export IMAGE_QUALITY_API_TOKEN="..."
+export OSS_SHARED_CONFIG="$HOME/.codex/resources/oss/config.json"
+export OSS_PROJECT="frisobabyaidemo"
+export OSS_IMAGE_QUALITY_SUBDIR="image-quality-check"
+```
+
+页面默认关闭质量检查。开启后，接口返回“中、高、模糊、严重模糊、不合格”时，
+原本可自动通过的结果会改为人工复核；可通过
+`IMAGE_QUALITY_REVIEW_DESCRIPTIONS` 调整该集合。质量接口或 OSS 不可用时请求失败
+关闭，不会绕过检查后自动通过。
+
 启动：
 
 ```bash
@@ -124,6 +140,14 @@ pytest
 | `VISION_EXAMPLES_PER_LABEL` | `1` | 每个已有联合标签提供给模型的训练原型数 |
 | `MIN_CONFIDENCE` | `0.70` | 低于该值转人工复核 |
 | `ALLOWED_IMAGE_HOSTS` | `static.51dh.com.cn` | 批量图片域名白名单，逗号分隔 |
+| `IMAGE_QUALITY_API_URL` | 客户模糊度接口 | 可选图片质量检查地址 |
+| `IMAGE_QUALITY_API_TOKEN` | 空 | 图片质量接口 Token，只能由运行环境注入 |
+| `IMAGE_QUALITY_REVIEW_DESCRIPTIONS` | `中,高,模糊,严重模糊,不合格` | 命中后转人工复核的描述集合 |
+| `OSS_SHARED_CONFIG` | `~/.codex/resources/oss/config.json` | OSS 共享配置，凭证不得进入项目 |
+| `OSS_PROFILE` | 共享配置默认 profile | OSS profile |
+| `OSS_PROJECT` | `frisobabyaidemo` | OSS 项目隔离目录 |
+| `OSS_IMAGE_QUALITY_SUBDIR` | `image-quality-check` | 质量检查图片子目录 |
+| `OSS_SIGNED_URL_TTL_SECONDS` | `900` | 私有图片签名 URL 有效期（秒） |
 | `BATCH_MAX_ROWS` | `200` | 单批最大行数 |
 | `BATCH_CONCURRENCY` | `4` | 批量并发数 |
 | `MAX_IMAGE_BYTES` | `15728640` | 单图最大字节数 |
