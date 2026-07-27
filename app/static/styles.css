@@ -386,7 +386,6 @@ select:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(9, 108, 174
 .status-badge.passed { color: #8df1ca; background: rgba(19, 132, 93, .22); }
 .status-badge.rejected { color: #ffb3b6; background: rgba(191, 61, 66, .22); }
 .status-badge.manual_review { color: #ffd39d; background: rgba(184, 112, 24, .24); }
-.result-kicker small { color: #8fa9bb; }
 .result-view h3 { margin: 22px 0 8px; font-size: 32px; letter-spacing: -.03em; }
 .result-summary { margin: 0 0 26px; color: #b7cad6; font-size: 13px; line-height: 1.65; }
 .comparison { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; }

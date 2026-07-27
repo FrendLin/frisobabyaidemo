@@ -73,28 +73,37 @@ function confirmationItem(label, expected, detected) {
     </li>`;
 }
 
-function normalizedScore(value) {
+function metricValue(value) {
+  if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
   if (!Number.isFinite(number)) return null;
-  return number >= 0 && number <= 1 ? number * 100 : number;
+  return number;
 }
 
-function formatScore(value) {
-  const score = normalizedScore(value);
+function formatScore(value, digits = 2) {
+  const score = metricValue(value);
   if (score === null) return "--";
-  return score.toFixed(2).replace(/\.?0+$/, "");
+  return score.toFixed(digits).replace(/\.?0+$/, "");
+}
+
+function blurJudgement(value) {
+  const score = metricValue(value);
+  if (score === null) return "未返回";
+  return score > 55 ? "模糊" : "正常";
 }
 
 function brightnessJudgement(value) {
-  const score = normalizedScore(value);
+  const score = metricValue(value);
   if (score === null) return "未返回";
-  if (score < 25) return "偏低";
-  if (score > 55) return "偏高";
-  return "适中";
+  if (score <= 0.3) return "昏暗";
+  if (score >= 0.7) return "过曝";
+  return "正常";
 }
 
 function qualityHtml(qualityCheck) {
   if (!qualityCheck) return "";
+  const blurDescription =
+    qualityCheck.blur_description || blurJudgement(qualityCheck.blur);
   const brightnessDescription =
     qualityCheck.brightness_description || brightnessJudgement(qualityCheck.brightness);
   return `
@@ -112,15 +121,15 @@ function qualityHtml(qualityCheck) {
         <article>
           <span>模糊程度</span>
           <strong>${formatScore(qualityCheck.blur)}</strong>
-          <small>判断：${escapeHtml(qualityCheck.description || "未返回")}</small>
+          <small>判断：${escapeHtml(blurDescription)}</small>
         </article>
         <article>
           <span>明亮度</span>
-          <strong>${formatScore(qualityCheck.brightness)}</strong>
+          <strong>${formatScore(qualityCheck.brightness, 3)}</strong>
           <small>判断：${escapeHtml(brightnessDescription)}</small>
         </article>
       </div>
-      <p>分值统一按 0–100 展示；明亮度按 25 / 55 边界判断。</p>
+      <p>判定口径：模糊度 &gt; 55 为模糊；明亮度 ≤ 0.3 为昏暗，≥ 0.7 为过曝。</p>
     </section>`;
 }
 
@@ -136,7 +145,6 @@ function renderResult(result) {
     <div class="result-view">
       <div class="result-kicker">
         <span class="status-badge ${escapeHtml(result.status)}">${escapeHtml(title)}</span>
-        <small>${escapeHtml(result.provider)}</small>
       </div>
       <h3>${escapeHtml(title)}</h3>
       <p class="result-summary">${escapeHtml(summary)}</p>
@@ -226,7 +234,7 @@ fetch("/api/health")
   .then((health) => {
     const ready = health.status === "ok";
     healthPill.classList.add(ready ? "ready" : "degraded");
-    healthText.textContent = ready ? `识别服务已就绪 · ${health.provider}` : "待配置识别模型";
+    healthText.textContent = ready ? "识别服务已就绪" : "待配置识别模型";
   })
   .catch(() => {
     healthPill.classList.add("degraded");

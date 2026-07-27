@@ -126,4 +126,7 @@ def test_result_ui_only_displays_brand_type_and_quality_metrics() -> None:
     assert 'confirmationItem("类型"' in script
     assert "模糊程度" in script
     assert "明亮度" in script
+    assert "blur_description" in script
     assert "brightness_description" in script
+    assert "result.provider" not in script
+    assert "health.provider" not in script
