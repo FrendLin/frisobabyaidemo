@@ -240,7 +240,7 @@ def _describe_brightness(value: float | None) -> str | None:
     """Apply the documented brightness bands on the API's 0–1 scale."""
     if value is None:
         return None
-    if value <= 0.3:
+    if value <= 0.35:
         return "昏暗"
     if value >= 0.7:
         return "过曝"

@@ -49,7 +49,8 @@ async def test_external_quality_client_parses_review_level() -> None:
     [
         (55, 0.5, "正常", "正常", True),
         (55.01, 0.5, "模糊", "正常", False),
-        (55, 0.3, "正常", "昏暗", False),
+        (55, 0.35, "正常", "昏暗", False),
+        (55, 0.3501, "正常", "正常", True),
         (55, 0.7, "正常", "过曝", False),
     ],
 )

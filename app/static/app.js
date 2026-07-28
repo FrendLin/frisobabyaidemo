@@ -95,7 +95,7 @@ function blurJudgement(value) {
 function brightnessJudgement(value) {
   const score = metricValue(value);
   if (score === null) return "未返回";
-  if (score <= 0.3) return "昏暗";
+  if (score <= 0.35) return "昏暗";
   if (score >= 0.7) return "过曝";
   return "正常";
 }
@@ -129,7 +129,7 @@ function qualityHtml(qualityCheck) {
           <small>判断：${escapeHtml(brightnessDescription)}</small>
         </article>
       </div>
-      <p>判定口径：模糊度 &gt; 55 为模糊；明亮度 ≤ 0.3 为昏暗，≥ 0.7 为过曝。</p>
+      <p>判定口径：模糊度 &gt; 55 为模糊；明亮度 ≤ 0.35 为昏暗，≥ 0.7 为过曝。</p>
     </section>`;
 }
 
