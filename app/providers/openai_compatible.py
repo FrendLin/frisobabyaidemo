@@ -10,9 +10,13 @@ import httpx
 
 from app.config import Settings
 from app.domain import Brand, MATERIAL_RULES, MaterialType
-from app.models import DetectedMaterial
+from app.models import DetectedMaterial, VisionResult
 from app.providers.base import ProviderError, VisionProvider
 from app.training import TrainingExample
+
+
+# 单张图片最多返回的检测项数量，避免模型返回无界列表。
+MAX_DETECTIONS = 8
 
 
 class OpenAICompatibleProvider(VisionProvider):
@@ -26,7 +30,7 @@ class OpenAICompatibleProvider(VisionProvider):
         self.settings = settings
         self.training_examples = tuple(training_examples)
 
-    async def analyze(self, image_bytes: bytes, mime_type: str) -> DetectedMaterial:
+    async def analyze(self, image_bytes: bytes, mime_type: str) -> VisionResult:
         encoded = base64.b64encode(image_bytes).decode("ascii")
         data_url = f"data:{mime_type};base64,{encoded}"
         try:
@@ -45,7 +49,7 @@ class OpenAICompatibleProvider(VisionProvider):
         *,
         training_examples: Sequence[TrainingExample] | None = None,
         calibration_brand: Brand | None = None,
-    ) -> DetectedMaterial:
+    ) -> VisionResult:
         endpoint, payload = self._build_request(
             data_url,
             training_examples=training_examples,
@@ -61,14 +65,58 @@ class OpenAICompatibleProvider(VisionProvider):
         )
         response.raise_for_status()
         parsed = self._parse_json(self._extract_content(response.json()))
-        return DetectedMaterial(
-            brand=self._normalize_brand(parsed.get("brand")),
-            material_type=self._normalize_type(parsed.get("material_type")),
-            confidence=float(parsed.get("confidence", 0)),
-            evidence=self._as_text_list(parsed.get("evidence")),
+        return self._build_result(parsed)
+
+    def _build_result(self, parsed: dict[str, Any]) -> VisionResult:
+        raw_items = parsed.get("detections")
+        if not isinstance(raw_items, list):
+            # 兼容仅返回单组合的旧模型输出。
+            if parsed.get("brand") is not None or parsed.get("material_type") is not None:
+                raw_items = [parsed]
+            else:
+                raw_items = []
+        detections: list[DetectedMaterial] = []
+        for item in raw_items:
+            if not isinstance(item, dict):
+                continue
+            detections.append(
+                DetectedMaterial(
+                    brand=self._normalize_brand(item.get("brand")),
+                    material_type=self._normalize_type(item.get("material_type")),
+                    confidence=self._as_confidence(item.get("confidence")),
+                    evidence=self._as_text_list(item.get("evidence")),
+                    region=str(item.get("region", ""))[:200],
+                    rationale=str(item.get("rationale", ""))[:1000],
+                )
+            )
+        deduped = self._dedupe(detections)
+        return VisionResult(
+            detections=deduped,
             warnings=self._as_text_list(parsed.get("warnings")),
-            rationale=str(parsed.get("rationale", "")),
         )
+
+    @staticmethod
+    def _dedupe(detections: list[DetectedMaterial]) -> list[DetectedMaterial]:
+        """按“品牌 + 类型”去重，保留置信度更高、证据更完整的一项。"""
+
+        best: dict[tuple[str | None, str | None], DetectedMaterial] = {}
+        for item in detections:
+            key = (
+                item.brand.value if item.brand else None,
+                item.material_type.value if item.material_type else None,
+            )
+            current = best.get(key)
+            if current is None:
+                best[key] = item
+                continue
+            better = (item.confidence, len(item.evidence)) > (
+                current.confidence,
+                len(current.evidence),
+            )
+            if better:
+                best[key] = item
+        ordered = sorted(best.values(), key=lambda d: d.confidence, reverse=True)
+        return ordered[:MAX_DETECTIONS]
 
     def _build_request(
         self,
@@ -229,6 +277,14 @@ class OpenAICompatibleProvider(VisionProvider):
         return [str(item)[:300] for item in value[:8]]
 
     @staticmethod
+    def _as_confidence(value: Any) -> float:
+        try:
+            score = float(value)
+        except (TypeError, ValueError):
+            return 0.0
+        return min(1.0, max(0.0, score))
+
+    @staticmethod
     def _parse_json(content: str) -> dict[str, Any]:
         cleaned = content.strip()
         cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
@@ -272,6 +328,9 @@ class OpenAICompatibleProvider(VisionProvider):
             "店招": MaterialType.EXTERIOR,
             "外立面广告": MaterialType.EXTERIOR,
             "店内海报": MaterialType.IN_STORE_POSTER,
+            "嵌入柜": MaterialType.EMBEDDED_CABINET,
+            "陈列柜": MaterialType.EMBEDDED_CABINET,
+            "陈列墙": MaterialType.EMBEDDED_CABINET,
         }
         if text in aliases:
             return aliases[text]
@@ -289,7 +348,7 @@ class OpenAICompatibleProvider(VisionProvider):
         brands = "、".join(brand.value for brand in Brand)
         material_types = "、".join(item.value for item in MaterialType)
         return f"""
-任务：识别图片中的美素佳儿子品牌与大型物料类型。
+任务：识别图片中所有可归属的美素佳儿子品牌大型物料载体，并逐个给出“品牌 + 物料类型”组合。
 
 候选品牌仅限：{brands}。
 候选物料类型仅限：{material_types}。
@@ -303,20 +362,27 @@ class OpenAICompatibleProvider(VisionProvider):
 物料判定规则：
 {rules}
 
-判定顺序：
-1. 先找到图片中面积最大、最居中、最完整的目标广告载体，忽略货架商品、背景广告和竞品。
-2. 再只根据该载体上的品牌名、产品罐体、主视觉或明确品牌资产判断品牌。
-3. 根据载体结构判类型，优先级为：吊旗/包柱等明确结构 > 独立发光箱体 > 玻璃贴或整墙贴 > 店外招牌/外立面 > 店内薄海报。
-4. 若同一画面包含多个子品牌，选择目标载体上面积最大、最靠近画面中心或最靠近镜头的品牌；不要因为背景货架上还有其他罐体就返回 null。
-5. 通用 “Friso 美素佳儿” 配合“双硬核 强内护”、金白罐和绿色圆环时判皇家；“3岁+ 超群强护 进阶成长”判旺玥。
+识别要求：
+1. 逐个识别图片中可见、可归属到候选品牌的大型物料载体（灯箱、吊旗、包柱、嵌柜、店招/外立面、橱窗/墙贴、店内海报等）。
+2. 同一张图可以有多个组合，例如“皇家-灯箱”和“尊悦-灯箱”，请分别作为独立检测项返回。
+3. 普通货架上的单个奶粉商品罐、竞品、背景广告不是独立的大型物料结果，不要作为检测项返回。
+4. 嵌柜是整体定制/固定式品牌陈列柜（含连续货架、品牌楣头、背板/侧板、灯带等）；柜内单独的发光画面不要因此误判为“灯箱”，若目标载体覆盖完整柜体优先判嵌柜。
+5. 每个检测项的品牌只依据该载体上的品牌名、罐体、主视觉或明确品牌资产判断；无法确定的字段返回 null，不要猜测。
+6. 对每个检测项给出 confidence（0~1）、evidence（图片可见证据）和 region（该载体在画面中的大致位置，如“画面左侧立柱”）。
 
 仅返回以下 JSON：
 {{
-  "brand": "候选品牌之一或 null",
-  "material_type": "候选物料类型之一或 null",
-  "confidence": 0.0,
-  "evidence": ["最多 5 条图片可见证据"],
-  "warnings": ["昏暗、过曝、模糊、遮挡等"],
-  "rationale": "不超过 120 字"
+  "detections": [
+    {{
+      "brand": "候选品牌之一或 null",
+      "material_type": "候选物料类型之一或 null",
+      "confidence": 0.0,
+      "evidence": ["最多 5 条图片可见证据"],
+      "region": "该载体在画面中的位置描述",
+      "rationale": "不超过 60 字"
+    }}
+  ],
+  "warnings": ["昏暗、过曝、模糊、遮挡等整体画质问题"]
 }}
+如果图片中没有可归属的大型品牌物料，detections 返回空数组 []。
 """.strip()

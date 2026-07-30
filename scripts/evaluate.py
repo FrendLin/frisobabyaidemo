@@ -91,21 +91,29 @@ async def evaluate(
                     "exact_correct": False,
                     "error": error_message,
                 }
+            # 模型现在返回多组合；测试集每条为单一期望标签，
+            # 因此判定口径为“期望组合是否出现在检测列表中”（多组合成员判定）。
+            items = detected.detections
+            top = max(items, key=lambda d: d.confidence, default=None)
+            brand_correct = any(d.brand == actual_brand for d in items)
+            type_correct = any(d.material_type == actual_type for d in items)
+            exact_correct = any(
+                d.brand == actual_brand and d.material_type == actual_type
+                for d in items
+            )
             return {
                 "sample_id": sample["sample_id"],
                 "actual_brand": actual_brand.value,
                 "actual_material_type": actual_type.value,
-                "predicted_brand": detected.brand.value if detected.brand else None,
+                "predicted_brand": top.brand.value if top and top.brand else None,
                 "predicted_material_type": (
-                    detected.material_type.value if detected.material_type else None
+                    top.material_type.value if top and top.material_type else None
                 ),
-                "confidence": detected.confidence,
-                "brand_correct": detected.brand == actual_brand,
-                "type_correct": detected.material_type == actual_type,
-                "exact_correct": (
-                    detected.brand == actual_brand
-                    and detected.material_type == actual_type
-                ),
+                "confidence": top.confidence if top else 0,
+                "detection_count": len(items),
+                "brand_correct": brand_correct,
+                "type_correct": type_correct,
+                "exact_correct": exact_correct,
             }
 
         predictions = await asyncio.gather(*(predict(sample) for sample in samples))

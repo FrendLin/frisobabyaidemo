@@ -45,7 +45,7 @@ async def test_mismatch_is_rejected(image_bytes: bytes) -> None:
         mime_type="image/jpeg",
     )
     assert result.status == "rejected"
-    assert "品牌不匹配" in result.reasons[0]
+    assert "没有匹配所选" in result.reasons[0]
 
 
 @pytest.mark.asyncio

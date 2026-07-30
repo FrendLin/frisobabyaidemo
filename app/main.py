@@ -104,14 +104,18 @@ def create_app(
 
     @application.post("/api/review", response_model=ReviewDecision)
     async def review_single(
-        brand: str = Form(...),
-        material_type: str = Form(...),
+        brand: str = Form(""),
+        material_type: str = Form(""),
         image: UploadFile = File(...),
         quality_check: bool = Form(False),
     ) -> ReviewDecision:
+        expected_brand: Brand | None = None
+        expected_material_type: MaterialType | None = None
         try:
-            expected_brand = Brand(brand)
-            expected_material_type = MaterialType(material_type)
+            if brand.strip():
+                expected_brand = Brand(brand.strip())
+            if material_type.strip():
+                expected_material_type = MaterialType(material_type.strip())
         except ValueError as error:
             raise HTTPException(status_code=422, detail=f"品牌或物料类型不合法：{error}") from error
 

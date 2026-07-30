@@ -58,21 +58,6 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
-function confirmationItem(label, expected, detected) {
-  const available = Boolean(detected);
-  const matched = available && expected === detected;
-  const judgement = !available ? "无法确认" : matched ? "确认一致" : "确认不一致";
-  const tone = !available ? "unknown" : matched ? "matched" : "mismatched";
-  return `
-    <li class="confirmation-item">
-      <div>
-        <small>${escapeHtml(label)}确认</small>
-        <strong>期望 ${escapeHtml(expected)} · 识别 ${escapeHtml(detected || "无法判断")}</strong>
-      </div>
-      <span class="confirmation-badge ${tone}">${judgement}</span>
-    </li>`;
-}
-
 function metricValue(value) {
   if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
@@ -84,6 +69,12 @@ function formatScore(value, digits = 2) {
   const score = metricValue(value);
   if (score === null) return "--";
   return score.toFixed(digits).replace(/\.?0+$/, "");
+}
+
+function percent(value) {
+  const score = metricValue(value);
+  if (score === null) return "--";
+  return `${Math.round(score * 100)}%`;
 }
 
 function blurJudgement(value) {
@@ -133,40 +124,98 @@ function qualityHtml(qualityCheck) {
     </section>`;
 }
 
+function detectionCard(detection, mode) {
+  const brand = detection.brand || "未知品牌";
+  const material = detection.material_type || "未知类型";
+  const tags = [];
+  tags.push(
+    detection.reliable
+      ? '<span class="detection-tag reliable">达到阈值</span>'
+      : '<span class="detection-tag low">置信度不足</span>'
+  );
+  if (mode === "review" && detection.matches_selection !== null) {
+    tags.push(
+      detection.matches_selection
+        ? '<span class="detection-tag matched">匹配所选</span>'
+        : '<span class="detection-tag mismatched">不匹配所选</span>'
+    );
+  }
+  const evidence = (detection.evidence || [])
+    .map((item) => `<li>${escapeHtml(item)}</li>`)
+    .join("");
+  const region = detection.region
+    ? `<p class="detection-region">位置：${escapeHtml(detection.region)}</p>`
+    : "";
+  return `
+    <article class="detection-card">
+      <div class="detection-head">
+        <strong>${escapeHtml(brand)} · ${escapeHtml(material)}</strong>
+        <span class="detection-confidence">置信度 ${percent(detection.confidence)}</span>
+      </div>
+      <div class="detection-tags">${tags.join("")}</div>
+      ${region}
+      ${evidence ? `<ul class="detection-evidence">${evidence}</ul>` : ""}
+    </article>`;
+}
+
+function detectionsHtml(detections, mode) {
+  if (!detections || !detections.length) {
+    return '<p class="detection-empty">未识别到可归属的大型品牌物料。</p>';
+  }
+  return `<div class="detection-list">${detections
+    .map((item) => detectionCard(item, mode))
+    .join("")}</div>`;
+}
+
 function renderResult(result) {
-  const labels = {
-    passed: ["审核通过", "图片与上传分组一致"],
-    rejected: ["审核驳回", "图片中的品牌或物料类型与上传分组不一致"],
-    manual_review: ["转人工复核", "品牌或物料类型仍需人工确认"],
+  const reviewLabels = {
+    passed: ["审核通过", "已识别到达到阈值且匹配所选条件的组合"],
+    rejected: ["审核驳回", "识别到可靠组合，但没有匹配所选条件的项"],
+    manual_review: ["转人工复核", "证据不足或置信度不够，需人工确认"],
   };
-  const [title, summary] = labels[result.status];
-  const qualityCheck = result.quality_check;
+  const recognitionLabels = {
+    recognized: ["识别结果", "已识别到以下可靠的「品牌 · 物料」组合"],
+    manual_review: ["转人工复核", "未识别到达到阈值的可靠组合"],
+  };
+  const isReview = result.mode === "review";
+  const [title, summary] = (isReview ? reviewLabels : recognitionLabels)[
+    result.status
+  ];
+
+  const selectedParts = [];
+  if (result.expected_brand) selectedParts.push(escapeHtml(result.expected_brand));
+  if (result.expected_material_type)
+    selectedParts.push(escapeHtml(result.expected_material_type));
+  const selectedText = selectedParts.length
+    ? selectedParts.join(" · ")
+    : "未指定（自动识别）";
+
+  const modeBadge = isReview
+    ? '<span class="mode-badge review">审核模式</span>'
+    : '<span class="mode-badge recognition">识别模式</span>';
+
+  const reasons = (result.reasons || [])
+    .map((item) => `<li>${escapeHtml(item)}</li>`)
+    .join("");
+
   resultCard.innerHTML = `
     <div class="result-view">
       <div class="result-kicker">
+        ${modeBadge}
         <span class="status-badge ${escapeHtml(result.status)}">${escapeHtml(title)}</span>
       </div>
       <h3>${escapeHtml(title)}</h3>
       <p class="result-summary">${escapeHtml(summary)}</p>
-      <div class="comparison">
-        <div class="comparison-card">
-          <small>期望分组</small>
-          <strong>${escapeHtml(result.expected_brand)} · ${escapeHtml(result.expected_material_type)}</strong>
-        </div>
-        <span class="comparison-arrow">→</span>
-        <div class="comparison-card">
-          <small>AI 识别</small>
-          <strong>${escapeHtml(result.detected_brand || "无法判断")} · ${escapeHtml(result.detected_material_type || "无法判断")}</strong>
-        </div>
+      <div class="selected-condition">
+        <small>所选审核条件</small>
+        <strong>${selectedText}</strong>
       </div>
       <div class="result-list">
-        <h4>审核原因</h4>
-        <ul>
-          ${confirmationItem("品牌", result.expected_brand, result.detected_brand)}
-          ${confirmationItem("类型", result.expected_material_type, result.detected_material_type)}
-        </ul>
+        <h4>识别到的组合</h4>
+        ${detectionsHtml(result.detections, result.mode)}
       </div>
-      ${qualityHtml(qualityCheck)}
+      ${reasons ? `<div class="result-list"><h4>说明</h4><ul>${reasons}</ul></div>` : ""}
+      ${qualityHtml(result.quality_check)}
     </div>`;
 }
 
