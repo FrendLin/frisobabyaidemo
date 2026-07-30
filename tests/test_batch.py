@@ -99,3 +99,33 @@ async def test_batch_quality_check_reuses_source_url(
     headers = [cell.value for cell in result[1]]
     assert result.cell(2, headers.index("审核结果") + 1).value == "通过"
     assert checker.called_url == source_url
+
+
+@pytest.mark.asyncio
+async def test_batch_supports_embedded_cabinet(monkeypatch, image_bytes: bytes) -> None:
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["品牌", "物料类型", "图片链接"])
+    sheet.append(["皇家", "嵌柜", "https://static.51dh.com.cn/cabinet.jpg"])
+    source = BytesIO()
+    workbook.save(source)
+
+    async def fake_download(client, url, settings):
+        del client, url, settings
+        return image_bytes, "image/jpeg"
+
+    monkeypatch.setattr(batch_module, "_download_image", fake_download)
+    provider = FakeProvider(
+        DetectedMaterial(
+            brand=Brand.ROYAL,
+            material_type=MaterialType.EMBEDDED_CABINET,
+            confidence=0.9,
+        )
+    )
+    reviewer = MaterialReviewer(provider, Settings())
+    output = await process_workbook(source.getvalue(), reviewer, Settings())
+
+    result = load_workbook(BytesIO(output), data_only=True).active
+    headers = [cell.value for cell in result[1]]
+    assert result.cell(2, headers.index("审核结果") + 1).value == "通过"
+    assert result.cell(2, headers.index("识别物料类型") + 1).value == "嵌柜"

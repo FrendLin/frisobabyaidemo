@@ -386,6 +386,30 @@ select:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(9, 108, 174
 .status-badge.passed { color: #8df1ca; background: rgba(19, 132, 93, .22); }
 .status-badge.rejected { color: #ffb3b6; background: rgba(191, 61, 66, .22); }
 .status-badge.manual_review { color: #ffd39d; background: rgba(184, 112, 24, .24); }
+.status-badge.recognized { color: #8fd6ff; background: rgba(9, 108, 174, .28); }
+.result-kicker { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mode-badge { padding: 7px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .06em; }
+.mode-badge.review { color: #8fd6ff; background: rgba(9, 108, 174, .28); }
+.mode-badge.recognition { color: #d6e86a; background: rgba(191, 214, 48, .2); }
+.mode-hint { margin: 12px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.mode-hint strong { color: var(--navy); }
+.selected-condition { margin: 4px 0 6px; padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,.055); }
+.selected-condition small { display: block; color: #8fa9bb; font-size: 10px; letter-spacing: .06em; }
+.selected-condition strong { display: block; margin-top: 5px; color: #dce8ef; font-size: 14px; }
+.detection-list { display: grid; gap: 10px; }
+.detection-empty { margin: 0; color: #b7cad6; font-size: 13px; }
+.detection-card { padding: 13px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.055); }
+.detection-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.detection-head strong { font-size: 15px; color: #f0f6fa; }
+.detection-confidence { flex: 0 0 auto; color: #8fd6ff; font-size: 12px; font-weight: 700; }
+.detection-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.detection-tag { padding: 4px 8px; border-radius: 999px; font-size: 10px; font-weight: 800; }
+.detection-tag.reliable { color: #8df1ca; background: rgba(19,132,93,.22); }
+.detection-tag.low { color: #ffd39d; background: rgba(184,112,24,.24); }
+.detection-tag.matched { color: #8df1ca; background: rgba(19,132,93,.22); }
+.detection-tag.mismatched { color: #ffb3b6; background: rgba(191,61,66,.22); }
+.detection-region { margin: 8px 0 0; color: #8fa9bb; font-size: 11px; }
+.detection-evidence { margin: 8px 0 0; padding-left: 16px; display: grid; gap: 4px; color: #c6d6df; font-size: 11px; line-height: 1.5; }
 .result-view h3 { margin: 22px 0 8px; font-size: 32px; letter-spacing: -.03em; }
 .result-summary { margin: 0 0 26px; color: #b7cad6; font-size: 13px; line-height: 1.65; }
 .comparison { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; }

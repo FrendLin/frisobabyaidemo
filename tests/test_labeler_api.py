@@ -42,7 +42,8 @@ def test_labeler_config_lists_brands_and_materials(tmp_path: Path) -> None:
     groups = {g["group"] for g in data["brand_catalog"]}
     assert "皇家美素" in groups
     assert "灯箱" in data["material_types"]
-    assert len(data["material_types"]) == 6
+    assert "嵌柜" in data["material_types"]
+    assert len(data["material_types"]) == 7
 
 
 def test_pick_directory_returns_absolute_path(

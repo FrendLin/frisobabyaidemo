@@ -8,7 +8,7 @@
       name="description"
       content="按品牌与物料类型审核线下大型物料，支持单图识别与 Excel 批量处理。"
     />
-    <link rel="stylesheet" href="/static/styles.css?v=20260728-2" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260729-1" />
   </head>
   <body>
     <div class="page-shell">
@@ -39,7 +39,7 @@
           </div>
           <div class="hero-metrics" aria-label="项目范围">
             <article><strong>4</strong><span>子品牌</span></article>
-            <article><strong>6</strong><span>物料类型</span></article>
+            <article><strong>7</strong><span>物料类型</span></article>
             <article><strong>2</strong><span>审核模式</span></article>
           </div>
         </section>
@@ -67,9 +67,9 @@
               <form id="singleForm">
                 <div class="field-grid">
                   <label>
-                    <span>期望品牌</span>
-                    <select name="brand" required>
-                      <option value="">请选择</option>
+                    <span>期望品牌（可选）</span>
+                    <select name="brand">
+                      <option value="">未指定 / 自动识别</option>
                       <option>皇家</option>
                       <option>旺玥</option>
                       <option>源悦</option>
@@ -77,18 +77,23 @@
                     </select>
                   </label>
                   <label>
-                    <span>期望物料类型</span>
-                    <select name="material_type" required>
-                      <option value="">请选择</option>
+                    <span>期望物料类型（可选）</span>
+                    <select name="material_type">
+                      <option value="">未指定 / 自动识别</option>
                       <option>灯箱</option>
                       <option>橱窗单透/墙贴</option>
                       <option>店内海报（非货架）</option>
                       <option>店招/外立面广告</option>
                       <option>吊旗</option>
                       <option>包柱画面</option>
+                      <option>嵌柜</option>
                     </select>
                   </label>
                 </div>
+                <p class="mode-hint">
+                  不选任何条件用于<strong>自动识别</strong>一张图中的多个「品牌 · 物料」组合；
+                  选择品牌或类型中的一项或两项，则按所选维度进行<strong>审核</strong>。
+                </p>
                 <label class="drop-zone" id="dropZone">
                   <input
                     id="imageInput"
@@ -126,7 +131,7 @@
               <div class="empty-result">
                 <span class="result-orbit" aria-hidden="true"></span>
                 <h3>等待图片</h3>
-                <p>审核完成后，这里会显示结论、品牌与类型确认，以及可选的图片质量结果。</p>
+                <p>上传后，这里会显示识别到的多个「品牌 · 物料」组合、置信度与证据；若选择了条件，还会给出审核结论。</p>
               </div>
             </aside>
           </section>
@@ -174,7 +179,7 @@
           <section class="tab-panel" id="panel-rules">
             <div class="section-heading compact">
               <p class="step-label">AUDIT STANDARD</p>
-              <h2>六类物料判定口径</h2>
+              <h2>七类物料判定口径</h2>
               <p>品牌必须可见；场景、位置和物料结构共同决定物料类型。</p>
             </div>
             <div class="rules-grid">
@@ -184,6 +189,7 @@
               <article><span>04</span><h3>店招 / 外立面</h3><p>必须在店外；店招或外墙/店外展示板广告满足其一，并需出现对应品牌资产。</p></article>
               <article><span>05</span><h3>吊旗</h3><p>悬挂于店内天花板、通道或陈列区上方，通常成组、批量、错落出现。</p></article>
               <article><span>06</span><h3>包柱画面</h3><p>必须在店内，由海报或灯箱完整包裹立柱，形成圆柱或直立方柱形态。</p></article>
+              <article><span>07</span><h3>嵌柜</h3><p>店内整体固定/定制式品牌陈列柜：含连续货架、品牌楣头、背板/侧板或灯带；覆盖完整柜体时优先判嵌柜，而非柜内单块灯箱。</p></article>
             </div>
           </section>
         </section>
@@ -193,6 +199,6 @@
         <span>识别服务不可用时不产生“通过”结论</span>
       </footer>
     </div>
-    <script src="/static/app.js?v=20260728-3" defer></script>
+    <script src="/static/app.js?v=20260729-1" defer></script>
   </body>
 </html>

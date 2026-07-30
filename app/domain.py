@@ -17,6 +17,7 @@ class MaterialType(StrEnum):
     EXTERIOR = "店招/外立面广告"
     HANGING_FLAG = "吊旗"
     COLUMN_WRAP = "包柱画面"
+    EMBEDDED_CABINET = "嵌柜"
 
 
 MATERIAL_RULES: dict[MaterialType, tuple[str, ...]] = {
@@ -49,5 +50,11 @@ MATERIAL_RULES: dict[MaterialType, tuple[str, ...]] = {
         "必须位于店内，店外包柱无效。",
         "海报或灯箱完整包裹立柱，形成圆柱或直立方柱形态。",
         "必须能看到同一立柱的弧面或至少两个相连侧面；单块竖版平面不是包柱。",
+    ),
+    MaterialType.EMBEDDED_CABINET: (
+        "必须位于店内，整体为固定式或定制式的品牌商品陈列柜/陈列墙。",
+        "能看到承载奶粉商品的连续货架，同时具备品牌楣头、背板、侧板、灯带或整柜装饰中的至少一项。",
+        "识别对象是完整陈列单元，而不是柜内某一块独立灯箱、海报或普通货架上的单罐商品。",
+        "当整体嵌柜与柜内局部灯箱同时可见时，若目标载体覆盖完整柜体则优先判嵌柜。",
     ),
 }

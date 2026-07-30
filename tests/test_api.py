@@ -107,26 +107,31 @@ def test_template_download() -> None:
     assert response.content.startswith(b"PK")
 
 
-def test_home_page_has_quality_toggle_without_confidence_copy() -> None:
+def test_home_page_has_optional_fields_and_mode_hint() -> None:
     client = TestClient(create_app(Settings(), FakeProvider(DetectedMaterial(confidence=0))))
 
     response = client.get("/")
 
     assert response.status_code == 200
     assert "是否进行图片质量检查" in response.text
-    assert "置信度" not in response.text
+    assert "未指定 / 自动识别" in response.text
+    assert "嵌柜" in response.text
+    # 品牌与类型不再是必填项。
+    assert 'name="brand" required' not in response.text
+    assert 'name="material_type" required' not in response.text
 
 
-def test_result_ui_only_displays_brand_type_and_quality_metrics() -> None:
+def test_result_ui_renders_detections_and_modes() -> None:
     script = Path("app/static/app.js").read_text(encoding="utf-8")
 
-    assert "result.confidence" not in script
-    assert "result.reasons" not in script
-    assert 'confirmationItem("品牌"' in script
-    assert 'confirmationItem("类型"' in script
+    assert "result.detections" in script
+    assert "result.mode" in script
+    assert "recognized" in script
+    assert "detectionCard" in script
+    assert "matches_selection" in script
     assert "模糊程度" in script
     assert "明亮度" in script
     assert "blur_description" in script
     assert "brightness_description" in script
-    assert "result.provider" not in script
-    assert "health.provider" not in script
+    # 纯识别模式不得出现“审核通过”。
+    assert "审核通过" not in script or "识别结果" in script

@@ -5,17 +5,20 @@ from io import BytesIO
 import pytest
 from PIL import Image, ImageDraw
 
-from app.models import DetectedMaterial
+from app.models import DetectedMaterial, VisionResult
 from app.providers.base import VisionProvider
 
 
 class FakeProvider(VisionProvider):
     name = "fake"
 
-    def __init__(self, result: DetectedMaterial) -> None:
+    def __init__(self, result: VisionResult | DetectedMaterial) -> None:
+        # 兼容旧用法：单个 DetectedMaterial 自动包装成 VisionResult。
+        if isinstance(result, DetectedMaterial):
+            result = VisionResult(detections=[result])
         self.result = result
 
-    async def analyze(self, image_bytes: bytes, mime_type: str) -> DetectedMaterial:
+    async def analyze(self, image_bytes: bytes, mime_type: str) -> VisionResult:
         assert image_bytes
         assert mime_type.startswith("image/")
         return self.result

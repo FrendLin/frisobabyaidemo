@@ -4,7 +4,7 @@
 - 品牌目录是审核用 ``Brand`` 四个子品牌的超集，额外包含市面常见奶粉品牌与
   “其他/无法判断”辅助项，供人工标注选择；只有落在 ``Brand`` 中的四个皇家子品牌
   才能进入训练/评测清单（见 ``manifest``）。
-- 物料类型严格复用审核标准的六类 ``MaterialType``。
+- 物料类型严格复用审核标准的 ``MaterialType`` 全部类型。
 - 标注结果保存在独立的数据目录，绝不写入用户原始图片目录，也不修改原图。
 """
 
@@ -56,7 +56,7 @@ BRAND_CATALOG: tuple[dict[str, object], ...] = (
 # 全部合法品牌取值。
 ALL_BRANDS: frozenset[str] = frozenset(ROYAL_BRANDS + COMMON_BRANDS + AUXILIARY_BRANDS)
 
-# 严格六类物料，直接来自审核标准。
+# 标准物料类型，直接来自审核标准。
 MATERIAL_TYPES: tuple[str, ...] = tuple(item.value for item in MaterialType)
 ALL_MATERIALS: frozenset[str] = frozenset(MATERIAL_TYPES)
 
